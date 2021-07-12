@@ -9,8 +9,8 @@ TODO: review and make sure these notes are covered:
 >             - firstIndex {=, >} 0
 >     - x= {drawIndexed, drawIndexedIndirect}
 
-TODO: Since there are no errors here, these should be "robustness" operation tests (with multiple
-valid results).
+TODO: Add back tests for DrawIndexed buffer OOB validation. Currently the test are removed, due to
+to OOB behavior changing from no-op to validation error.
 `;
 
 import { makeTestGroup } from '../../../../../common/framework/test_group.js';
@@ -154,21 +154,7 @@ g.test('out_of_bounds')
         ] as const)
         .combine('instanceCount', [1, 10000]) // normal and large instanceCount
   )
-  .fn(t => {
-    const { indirect, indexCount, firstIndex, instanceCount } = t.params;
-
-    const indexBuffer = t.createIndexBuffer([0, 1, 2, 3, 1, 2]);
-
-    if (indirect) {
-      t.drawIndexedIndirect(
-        indexBuffer,
-        new Uint32Array([indexCount, instanceCount, firstIndex, 0, 0]),
-        0
-      );
-    } else {
-      t.drawIndexed(indexBuffer, indexCount, instanceCount, firstIndex, 0, 0);
-    }
-  });
+  .unimplemented();
 
 g.test('out_of_bounds_zero_sized_index_buffer')
   .desc(
@@ -192,18 +178,4 @@ g.test('out_of_bounds_zero_sized_index_buffer')
         ] as const)
         .combine('instanceCount', [1, 10000]) // normal and large instanceCount
   )
-  .fn(t => {
-    const { indirect, indexCount, firstIndex, instanceCount } = t.params;
-
-    const indexBuffer = t.createIndexBuffer([]);
-
-    if (indirect) {
-      t.drawIndexedIndirect(
-        indexBuffer,
-        new Uint32Array([indexCount, instanceCount, firstIndex, 0, 0]),
-        0
-      );
-    } else {
-      t.drawIndexed(indexBuffer, indexCount, instanceCount, firstIndex, 0, 0);
-    }
-  });
+  .unimplemented();
