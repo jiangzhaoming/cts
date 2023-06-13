@@ -1,4 +1,4 @@
-// Types ensure every field is specified.
+// Note: Types ensure every field is specified.
 
 /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
 function checkType<T>(x: T) {}
@@ -20,7 +20,9 @@ checkType<Omit<GPUBufferUsage, '__brand'>>(BufferUsage);
 const TextureUsage = {
   COPY_SRC: 0x01,
   COPY_DST: 0x02,
+  TEXTURE_BINDING: 0x04,
   SAMPLED: 0x04,
+  STORAGE_BINDING: 0x08,
   STORAGE: 0x08,
   RENDER_ATTACHMENT: 0x10,
 } as const;
@@ -56,23 +58,5 @@ export const GPUConst = {
   MapMode,
 } as const;
 
-type Limits = Omit<GPUAdapterLimits, '__brand'>;
-export const DefaultLimits: Limits = {
-  maxTextureDimension1D: 8192,
-  maxTextureDimension2D: 8192,
-  maxTextureDimension3D: 2048,
-  maxTextureArrayLayers: 2048,
-  maxBindGroups: 4,
-  maxDynamicUniformBuffersPerPipelineLayout: 8,
-  maxDynamicStorageBuffersPerPipelineLayout: 4,
-  maxSampledTexturesPerShaderStage: 16,
-  maxSamplersPerShaderStage: 16,
-  maxStorageBuffersPerShaderStage: 4,
-  maxStorageTexturesPerShaderStage: 4,
-  maxUniformBuffersPerShaderStage: 12,
-  maxUniformBufferBindingSize: 16384,
-  maxStorageBufferBindingSize: 134217728,
-  maxVertexBuffers: 8,
-  maxVertexAttributes: 16,
-  maxVertexBufferArrayStride: 2048,
-};
+export const kMaxUnsignedLongValue = 4294967295;
+export const kMaxUnsignedLongLongValue = Number.MAX_SAFE_INTEGER;

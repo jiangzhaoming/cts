@@ -56,9 +56,8 @@ Test locations are framebuffer coordinates:
    v1       v3        v5                                        Triangle {v2, v3, v4}
                                                                 and {v3, v4, v5}.
 `;
-import { params, pbool, poptions } from '../../../../common/framework/params_builder.js';
 import { makeTestGroup } from '../../../../common/framework/test_group.js';
-import { GPUTest } from '../../../gpu_test.js';
+import { GPUTest, TextureTestMixin } from '../../../gpu_test.js';
 
 const kRTSize = 56;
 const kColorFormat = 'rgba8unorm';
@@ -102,7 +101,7 @@ function getPointTestLocations(expectedColor) {
   // Test points are always equal to vertex locations.
   const testLocations = [];
   for (const location of VertexLocations) {
-    testLocations.push({ location, color: expectedColor });
+    testLocations.push({ coord: location, exp: expectedColor });
   }
   return testLocations;
 }
@@ -112,20 +111,18 @@ function getLineTestLocations(expectedColor) {
   return [
     {
       // Line {v1, v2}
-      location: Point2D.getMidpoint(VertexLocations[0], VertexLocations[1]),
-      color: expectedColor,
+      coord: Point2D.getMidpoint(VertexLocations[0], VertexLocations[1]),
+      exp: expectedColor,
     },
-
     {
       // Line {v3, v4}
-      location: Point2D.getMidpoint(VertexLocations[2], VertexLocations[3]),
-      color: expectedColor,
+      coord: Point2D.getMidpoint(VertexLocations[2], VertexLocations[3]),
+      exp: expectedColor,
     },
-
     {
       // Line {v5, v6}
-      location: Point2D.getMidpoint(VertexLocations[4], VertexLocations[5]),
-      color: expectedColor,
+      coord: Point2D.getMidpoint(VertexLocations[4], VertexLocations[5]),
+      exp: expectedColor,
     },
   ];
 }
@@ -135,14 +132,13 @@ function getPrimitiveRestartLineTestLocations(expectedColor) {
   return [
     {
       // Line {v1, v2}
-      location: Point2D.getMidpoint(VertexLocations[0], VertexLocations[1]),
-      color: expectedColor,
+      coord: Point2D.getMidpoint(VertexLocations[0], VertexLocations[1]),
+      exp: expectedColor,
     },
-
     {
       // Line {v5, v6}
-      location: Point2D.getMidpoint(VertexLocations[4], VertexLocations[5]),
-      color: expectedColor,
+      coord: Point2D.getMidpoint(VertexLocations[4], VertexLocations[5]),
+      exp: expectedColor,
     },
   ];
 }
@@ -152,14 +148,13 @@ function getLineStripTestLocations(expectedColor) {
   return [
     {
       // Line {v2, v3}
-      location: Point2D.getMidpoint(VertexLocations[1], VertexLocations[2]),
-      color: expectedColor,
+      coord: Point2D.getMidpoint(VertexLocations[1], VertexLocations[2]),
+      exp: expectedColor,
     },
-
     {
       // Line {v4, v5}
-      location: Point2D.getMidpoint(VertexLocations[3], VertexLocations[4]),
-      color: expectedColor,
+      coord: Point2D.getMidpoint(VertexLocations[3], VertexLocations[4]),
+      exp: expectedColor,
     },
   ];
 }
@@ -169,14 +164,13 @@ function getTriangleListTestLocations(expectedColor) {
   return [
     {
       // Triangle {v1, v2, v3}
-      location: Point2D.getCentroid(VertexLocations[0], VertexLocations[1], VertexLocations[2]),
-      color: expectedColor,
+      coord: Point2D.getCentroid(VertexLocations[0], VertexLocations[1], VertexLocations[2]),
+      exp: expectedColor,
     },
-
     {
       // Triangle {v4, v5, v6}
-      location: Point2D.getCentroid(VertexLocations[3], VertexLocations[4], VertexLocations[5]),
-      color: expectedColor,
+      coord: Point2D.getCentroid(VertexLocations[3], VertexLocations[4], VertexLocations[5]),
+      exp: expectedColor,
     },
   ];
 }
@@ -186,14 +180,13 @@ function getTriangleStripTestLocations(expectedColor) {
   return [
     {
       // Triangle {v2, v3, v4}
-      location: Point2D.getCentroid(VertexLocations[1], VertexLocations[2], VertexLocations[3]),
-      color: expectedColor,
+      coord: Point2D.getCentroid(VertexLocations[1], VertexLocations[2], VertexLocations[3]),
+      exp: expectedColor,
     },
-
     {
       // Triangle {v3, v4, v5}
-      location: Point2D.getCentroid(VertexLocations[2], VertexLocations[3], VertexLocations[4]),
-      color: expectedColor,
+      coord: Point2D.getCentroid(VertexLocations[2], VertexLocations[3], VertexLocations[4]),
+      exp: expectedColor,
     },
   ];
 }
@@ -209,8 +202,8 @@ function getDefaultTestLocations({
     return locations.map((tl, i) => {
       if (i === locations.length - 1) {
         return {
-          location: tl.location,
-          color: kInvalidPixelColor,
+          coord: tl.coord,
+          exp: kInvalidPixelColor,
         };
       } else {
         return tl;
@@ -281,7 +274,7 @@ function generateVertexBuffer(vertexLocations) {
 }
 
 const kDefaultDrawCount = 6;
-class PrimitiveTopologyTest extends GPUTest {
+class PrimitiveTopologyTest extends TextureTestMixin(GPUTest) {
   makeAttachmentTexture() {
     return this.device.createTexture({
       format: kColorFormat,
@@ -305,7 +298,8 @@ class PrimitiveTopologyTest extends GPUTest {
       colorAttachments: [
         {
           view: colorAttachment.createView(),
-          loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 0.0 },
+          clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 0.0 },
+          loadOp: 'clear',
           storeOp: 'store',
         },
       ],
@@ -323,16 +317,16 @@ class PrimitiveTopologyTest extends GPUTest {
     // Output color is solid green.
     renderPass.setPipeline(
       this.device.createRenderPipeline({
+        layout: 'auto',
         vertex: {
           module: this.device.createShaderModule({
             code: `
-              [[stage(vertex)]] fn main(
-                [[location(0)]] pos : vec4<f32>
-                ) -> [[builtin(position)]] vec4<f32> {
+              @vertex fn main(
+                @location(0) pos : vec4<f32>
+                ) -> @builtin(position) vec4<f32> {
                 return pos;
               }`,
           }),
-
           entryPoint: 'main',
           buffers: [
             {
@@ -347,19 +341,16 @@ class PrimitiveTopologyTest extends GPUTest {
             },
           ],
         },
-
         fragment: {
           module: this.device.createShaderModule({
             code: `
-              [[stage(fragment)]] fn main() -> [[location(0)]] vec4<f32> {
+              @fragment fn main() -> @location(0) vec4<f32> {
                 return vec4<f32>(0.0, 1.0, 0.0, 1.0);
               }`,
           }),
-
           entryPoint: 'main',
           targets: [{ format: kColorFormat }],
         },
-
         primitive: {
           topology,
           stripIndexFormat,
@@ -408,18 +399,10 @@ class PrimitiveTopologyTest extends GPUTest {
       }
     }
 
-    renderPass.endPass();
+    renderPass.end();
 
     this.device.queue.submit([encoder.finish()]);
-
-    for (const testPixel of testLocations) {
-      this.expectSinglePixelIn2DTexture(
-        colorAttachment,
-        kColorFormat,
-        { x: testPixel.location.x, y: testPixel.location.y },
-        { exp: testPixel.color }
-      );
-    }
+    this.expectSinglePixelComparisonsAreOkInTexture({ texture: colorAttachment }, testLocations);
   }
 }
 
@@ -439,11 +422,11 @@ g.test('basic')
     - primitiveRestart= { true, false } - always false for non-strip topologies
   `
   )
-  .cases(
-    params() //
-      .combine(poptions('topology', topologies))
-      .combine(pbool('indirect'))
-      .combine(pbool('primitiveRestart'))
+  .params(u =>
+    u //
+      .combine('topology', topologies)
+      .combine('indirect', [false, true])
+      .combine('primitiveRestart', [false, true])
       .unless(
         p => p.primitiveRestart && p.topology !== 'line-strip' && p.topology !== 'triangle-strip'
       )
@@ -466,18 +449,18 @@ g.test('unaligned_vertex_count')
                    One smaller for line-list. One or two smaller for triangle-list.
     `
   )
-  .cases(
-    params() //
-      .combine(poptions('topology', ['line-list', 'triangle-list']))
-      .combine(pbool('indirect'))
-      .expand(function* (p) {
+  .params(u =>
+    u //
+      .combine('topology', ['line-list', 'triangle-list'])
+      .combine('indirect', [false, true])
+      .expand('drawCount', function* (p) {
         switch (p.topology) {
           case 'line-list':
-            yield { drawCount: kDefaultDrawCount - 1 };
+            yield kDefaultDrawCount - 1;
             break;
           case 'triangle-list':
-            yield { drawCount: kDefaultDrawCount - 1 };
-            yield { drawCount: kDefaultDrawCount - 2 };
+            yield kDefaultDrawCount - 1;
+            yield kDefaultDrawCount - 2;
             break;
         }
       })

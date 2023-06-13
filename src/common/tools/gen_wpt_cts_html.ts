@@ -1,15 +1,15 @@
 import { promises as fs } from 'fs';
 
-import { DefaultTestFileLoader } from '../framework/file_loader.js';
-import { TestQueryMultiFile } from '../framework/query/query.js';
-import { assert } from '../framework/util/util.js';
+import { DefaultTestFileLoader } from '../internal/file_loader.js';
+import { TestQueryMultiFile } from '../internal/query/query.js';
+import { assert } from '../util/util.js';
 
 function printUsageAndExit(rc: number): void {
   console.error(`\
 Usage:
   tools/gen_wpt_cts_html OUTPUT_FILE TEMPLATE_FILE [ARGUMENTS_PREFIXES_FILE EXPECTATIONS_FILE EXPECTATIONS_PREFIX [SUITE]]
-  tools/gen_wpt_cts_html out-wpt/cts.html templates/cts.html
-  tools/gen_wpt_cts_html my/path/to/cts.html templates/cts.html arguments.txt myexpectations.txt 'path/to/cts.html' cts
+  tools/gen_wpt_cts_html out-wpt/cts.https.html templates/cts.https.html
+  tools/gen_wpt_cts_html my/path/to/cts.https.html templates/cts.https.html arguments.txt myexpectations.txt 'path/to/cts.https.html' cts
 
 where arguments.txt is a file containing a list of arguments prefixes to both generate and expect
 in the expectations. The entire variant list generation runs *once per prefix*, so this
@@ -20,21 +20,23 @@ multiplies the size of the variant list.
 
 and myexpectations.txt is a file containing a list of WPT paths to suppress, e.g.:
 
-  path/to/cts.html?worker=0&q=webgpu:a/foo:bar={"x":1}
-  path/to/cts.html?worker=1&q=webgpu:a/foo:bar={"x":1}
+  path/to/cts.https.html?worker=0&q=webgpu:a/foo:bar={"x":1}
+  path/to/cts.https.html?worker=1&q=webgpu:a/foo:bar={"x":1}
 
-  path/to/cts.html?worker=1&q=webgpu:a/foo:bar={"x":3}
+  path/to/cts.https.html?worker=1&q=webgpu:a/foo:bar={"x":3}
 `);
   process.exit(rc);
 }
 
 if (process.argv.length !== 4 && process.argv.length !== 7 && process.argv.length !== 8) {
-  printUsageAndExit(0);
+  console.error('incorrect number of arguments!');
+  printUsageAndExit(1);
 }
 
+// prettier-ignore
 const [
-  ,
-  ,
+  , // `node` binary
+  , // this script
   outFile,
   templateFile,
   argsPrefixesFile,
@@ -44,7 +46,7 @@ const [
 ] = process.argv;
 
 (async () => {
-  let argsPrefixes = [''];
+  let argsPrefixes = ['?q='];
   let expectationLines = new Set<string>();
 
   if (process.argv.length >= 7) {
@@ -80,12 +82,12 @@ const [
   const lines: Array<string | undefined> = [];
   for (const prefix of argsPrefixes) {
     const rootQuery = new TestQueryMultiFile(suite, []);
-    const tree = await loader.loadTree(rootQuery, expectations.get(prefix)!);
+    const tree = await loader.loadTree(rootQuery, expectations.get(prefix));
 
     lines.push(undefined); // output blank line between prefixes
     const alwaysExpandThroughLevel = 2; // expand to, at minimum, every test.
-    for (const q of tree.iterateCollapsedQueries(false, alwaysExpandThroughLevel)) {
-      const urlQueryString = prefix + q.toString(); // "?worker=0&q=..."
+    for (const { query } of tree.iterateCollapsedNodes({ alwaysExpandThroughLevel })) {
+      const urlQueryString = prefix + query.toString(); // "?worker=0&q=..."
       // Check for a safe-ish path length limit. Filename must be <= 255, and on Windows the whole
       // path must be <= 259. Leave room for e.g.:
       // 'c:\b\s\w\xxxxxxxx\layout-test-results\external\wpt\webgpu\cts_worker=0_q=...-actual.txt'

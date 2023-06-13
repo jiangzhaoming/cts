@@ -3,17 +3,18 @@ Basic tests.
 `;
 
 import { makeTestGroup } from '../../../../common/framework/test_group.js';
+import { memcpy } from '../../../../common/util/util.js';
 import { GPUTest } from '../../../gpu_test.js';
 
 export const g = makeTestGroup(GPUTest);
 
-g.test('empty').fn(async t => {
+g.test('empty').fn(t => {
   const encoder = t.device.createCommandEncoder();
   const cmd = encoder.finish();
   t.device.queue.submit([cmd]);
 });
 
-g.test('b2t2b').fn(async t => {
+g.test('b2t2b').fn(t => {
   const data = new Uint32Array([0x01020304]);
 
   const src = t.device.createBuffer({
@@ -21,7 +22,7 @@ g.test('b2t2b').fn(async t => {
     size: 4,
     usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   });
-  new Uint32Array(src.getMappedRange()).set(data);
+  memcpy({ src: data }, { dst: src.getMappedRange() });
   src.unmap();
 
   const dst = t.device.createBuffer({
@@ -48,10 +49,10 @@ g.test('b2t2b').fn(async t => {
   );
   t.device.queue.submit([encoder.finish()]);
 
-  t.expectContents(dst, data);
+  t.expectGPUBufferValuesEqual(dst, data);
 });
 
-g.test('b2t2t2b').fn(async t => {
+g.test('b2t2t2b').fn(t => {
   const data = new Uint32Array([0x01020304]);
 
   const src = t.device.createBuffer({
@@ -59,7 +60,7 @@ g.test('b2t2t2b').fn(async t => {
     size: 4,
     usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   });
-  new Uint32Array(src.getMappedRange()).set(data);
+  memcpy({ src: data }, { dst: src.getMappedRange() });
   src.unmap();
 
   const dst = t.device.createBuffer({
@@ -93,5 +94,5 @@ g.test('b2t2t2b').fn(async t => {
   );
   t.device.queue.submit([encoder.finish()]);
 
-  t.expectContents(dst, data);
+  t.expectGPUBufferValuesEqual(dst, data);
 });

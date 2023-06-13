@@ -2,11 +2,12 @@ export const description = `
 Tests for queries/filtering, loading, and running.
 `;
 
-import { TestFileLoader, SpecFile } from '../common/framework/file_loader.js';
 import { Fixture } from '../common/framework/fixture.js';
-import { Logger } from '../common/framework/logging/logger.js';
-import { Status } from '../common/framework/logging/result.js';
-import { parseQuery } from '../common/framework/query/parseQuery.js';
+import { makeTestGroup } from '../common/framework/test_group.js';
+import { TestFileLoader, SpecFile } from '../common/internal/file_loader.js';
+import { Logger } from '../common/internal/logging/logger.js';
+import { Status } from '../common/internal/logging/result.js';
+import { parseQuery } from '../common/internal/query/parseQuery.js';
 import {
   TestQuery,
   TestQuerySingleCase,
@@ -14,11 +15,11 @@ import {
   TestQueryMultiTest,
   TestQueryMultiFile,
   TestQueryWithExpectation,
-} from '../common/framework/query/query.js';
-import { makeTestGroup, makeTestGroupForUnitTesting } from '../common/framework/test_group.js';
-import { TestSuiteListing, TestSuiteListingEntry } from '../common/framework/test_suite_listing.js';
-import { ExpandThroughLevel, TestTreeLeaf } from '../common/framework/tree.js';
-import { assert, objectEquals } from '../common/framework/util/util.js';
+} from '../common/internal/query/query.js';
+import { makeTestGroupForUnitTesting } from '../common/internal/test_group.js';
+import { TestSuiteListing, TestSuiteListingEntry } from '../common/internal/test_suite_listing.js';
+import { ExpandThroughLevel, TestTreeLeaf } from '../common/internal/tree.js';
+import { assert, objectEquals } from '../common/util/util.js';
 
 import { UnitTest } from './unit_test.js';
 
@@ -42,16 +43,18 @@ const specsData: { [k: string]: SpecFile } = {
       const g = makeTestGroupForUnitTesting(UnitTest);
       g.test('hello').fn(() => {});
       g.test('bonjour').fn(() => {});
-      g.test('hola').fn(() => {});
+      g.test('hola')
+        .desc('TODO TODO')
+        .fn(() => {});
       return g;
     })(),
   },
   'suite1/bar/biz.spec.js': {
-    description: 'desc 1f',
+    description: 'desc 1f TODO TODO',
     g: makeTestGroupForUnitTesting(UnitTest), // file with no tests
   },
   'suite1/bar/buzz/buzz.spec.js': {
-    description: 'desc 1d',
+    description: 'desc 1d TODO',
     g: (() => {
       const g = makeTestGroupForUnitTesting(UnitTest);
       g.test('zap').fn(() => {});
@@ -63,10 +66,10 @@ const specsData: { [k: string]: SpecFile } = {
     g: (() => {
       const g = makeTestGroupForUnitTesting(UnitTest);
       g.test('wye')
-        .cases([{}, { x: 1 }])
+        .paramsSimple([{}, { x: 1 }])
         .fn(() => {});
       g.test('zed')
-        .cases([
+        .paramsSimple([
           { a: 1, b: 2, _c: 0 },
           { b: 3, a: 1, _c: 0 },
         ])
@@ -82,7 +85,7 @@ const specsData: { [k: string]: SpecFile } = {
         t.debug('OK');
       });
       g.test('bleh')
-        .cases([{ a: 1 }])
+        .paramsSimple([{ a: 1 }])
         .fn(t => {
           t.debug('OK');
           t.debug('OK');
@@ -96,21 +99,32 @@ const specsData: { [k: string]: SpecFile } = {
 };
 
 class FakeTestFileLoader extends TestFileLoader {
-  async listing(suite: string): Promise<TestSuiteListing> {
-    return listingData[suite];
+  listing(suite: string): Promise<TestSuiteListing> {
+    return Promise.resolve(listingData[suite]);
   }
 
-  async import(path: string): Promise<SpecFile> {
+  import(path: string): Promise<SpecFile> {
     assert(path in specsData, '[test] mock file ' + path + ' does not exist');
-    return specsData[path];
+    return Promise.resolve(specsData[path]);
   }
 }
 
 class LoadingTest extends UnitTest {
-  static readonly loader = new FakeTestFileLoader();
+  loader: FakeTestFileLoader = new FakeTestFileLoader();
+  events: (string | null)[] = [];
+  private isListenersAdded = false;
+
+  collectEvents(): void {
+    this.events = [];
+    if (!this.isListenersAdded) {
+      this.isListenersAdded = true;
+      this.loader.addEventListener('import', ev => this.events.push(ev.data.url));
+      this.loader.addEventListener('finish', ev => this.events.push(null));
+    }
+  }
 
   async load(query: string): Promise<TestTreeLeaf[]> {
-    return Array.from(await LoadingTest.loader.loadCases(parseQuery(query)));
+    return Array.from(await this.loader.loadCases(parseQuery(query)));
   }
 
   async loadNames(query: string): Promise<string[]> {
@@ -120,22 +134,45 @@ class LoadingTest extends UnitTest {
 
 export const g = makeTestGroup(LoadingTest);
 
-g.test('suite').fn(async t => {
+g.test('suite').fn(t => {
   t.shouldReject('Error', t.load('suite1'));
   t.shouldReject('Error', t.load('suite1:'));
 });
 
 g.test('group').fn(async t => {
+  t.collectEvents();
   t.expect((await t.load('suite1:*')).length === 8);
+  t.expect(
+    objectEquals(t.events, [
+      'suite1/foo.spec.js',
+      'suite1/bar/biz.spec.js',
+      'suite1/bar/buzz/buzz.spec.js',
+      'suite1/baz.spec.js',
+      null,
+    ])
+  );
+
+  t.collectEvents();
   t.expect((await t.load('suite1:foo,*')).length === 3); // x:foo,* matches x:foo:
+  t.expect(objectEquals(t.events, ['suite1/foo.spec.js', null]));
+
+  t.collectEvents();
   t.expect((await t.load('suite1:bar,*')).length === 1);
+  t.expect(
+    objectEquals(t.events, ['suite1/bar/biz.spec.js', 'suite1/bar/buzz/buzz.spec.js', null])
+  );
+
+  t.collectEvents();
   t.expect((await t.load('suite1:bar,buzz,buzz,*')).length === 1);
+  t.expect(objectEquals(t.events, ['suite1/bar/buzz/buzz.spec.js', null]));
 
   t.shouldReject('Error', t.load('suite1:f*'));
 
   {
     const s = new TestQueryMultiFile('suite1', ['bar', 'buzz']).toString();
+    t.collectEvents();
     t.expect((await t.load(s)).length === 1);
+    t.expect(objectEquals(t.events, ['suite1/bar/buzz/buzz.spec.js', null]));
   }
 });
 
@@ -227,7 +264,7 @@ g.test('end2end').fn(async t => {
   const l = await t.load('suite2:foof:*');
   assert(l.length === 3, 'listing length');
 
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
 
   await runTestcase(
     t,
@@ -265,7 +302,7 @@ g.test('end2end').fn(async t => {
 });
 
 g.test('expectations,single_case').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const zedCases = await t.load('suite1:baz:zed:*');
 
   // Single-case. Covers one case.
@@ -300,7 +337,7 @@ g.test('expectations,single_case').fn(async t => {
 });
 
 g.test('expectations,single_case,none').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const zedCases = await t.load('suite1:baz:zed:*');
   // Single-case. Doesn't cover any cases.
   const zedExpectationsSkipA1B0 = [
@@ -334,7 +371,7 @@ g.test('expectations,single_case,none').fn(async t => {
 });
 
 g.test('expectations,multi_case').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const zedCases = await t.load('suite1:baz:zed:*');
   // Multi-case, not all cases covered.
   const zedExpectationsSkipB3 = [
@@ -368,7 +405,7 @@ g.test('expectations,multi_case').fn(async t => {
 });
 
 g.test('expectations,multi_case_all').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const zedCases = await t.load('suite1:baz:zed:*');
   // Multi-case, all cases covered.
   const zedExpectationsSkipA1 = [
@@ -402,7 +439,7 @@ g.test('expectations,multi_case_all').fn(async t => {
 });
 
 g.test('expectations,multi_case_none').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const zedCases = await t.load('suite1:baz:zed:*');
   // Multi-case, no params, all cases covered.
   const zedExpectationsSkipZed = [
@@ -436,7 +473,7 @@ g.test('expectations,multi_case_none').fn(async t => {
 });
 
 g.test('expectations,multi_test').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const suite1Cases = await t.load('suite1:*');
 
   // Multi-test, all cases covered.
@@ -471,7 +508,7 @@ g.test('expectations,multi_test').fn(async t => {
 });
 
 g.test('expectations,multi_test,none').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const suite1Cases = await t.load('suite1:*');
 
   // Multi-test, no cases covered.
@@ -506,7 +543,7 @@ g.test('expectations,multi_test,none').fn(async t => {
 });
 
 g.test('expectations,multi_file').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const suite1Cases = await t.load('suite1:*');
 
   // Multi-file
@@ -541,7 +578,7 @@ g.test('expectations,multi_file').fn(async t => {
 });
 
 g.test('expectations,catches_failure').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const suite2Cases = await t.load('suite2:*');
 
   // Catches failure
@@ -577,7 +614,7 @@ g.test('expectations,catches_failure').fn(async t => {
 });
 
 g.test('expectations,skip_dominates_failure').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const suite2Cases = await t.load('suite2:*');
 
   const expectedFailures = [
@@ -604,7 +641,7 @@ g.test('expectations,skip_dominates_failure').fn(async t => {
 });
 
 g.test('expectations,skip_inside_failure').fn(async t => {
-  const log = new Logger(true);
+  const log = new Logger({ overrideDebugMode: true });
   const suite2Cases = await t.load('suite2:*');
 
   const expectedFailures = [
@@ -645,49 +682,61 @@ async function testIterateCollapsed(
   t: LoadingTest,
   alwaysExpandThroughLevel: ExpandThroughLevel,
   expectations: string[],
-  expectedResult: 'throws' | string[],
+  expectedResult: 'throws' | string[] | [string, number | undefined][],
   includeEmptySubtrees = false
 ) {
   t.debug(`expandThrough=${alwaysExpandThroughLevel} expectations=${expectations}`);
-  const treePromise = LoadingTest.loader.loadTree(
-    new TestQueryMultiFile('suite1', []),
-    expectations
-  );
+  const treePromise = t.loader.loadTree(new TestQueryMultiFile('suite1', []), expectations);
   if (expectedResult === 'throws') {
     t.shouldReject('Error', treePromise, 'loadTree should have thrown Error');
     return;
   }
   const tree = await treePromise;
-  const actualIter = tree.iterateCollapsedQueries(includeEmptySubtrees, alwaysExpandThroughLevel);
-  const actual = Array.from(actualIter, q => q.toString());
+  const actualIter = tree.iterateCollapsedNodes({
+    includeEmptySubtrees,
+    alwaysExpandThroughLevel,
+  });
+  const testingTODOs = expectedResult.length > 0 && expectedResult[0] instanceof Array;
+  const actual = Array.from(actualIter, ({ query, subtreeCounts }) =>
+    testingTODOs ? [query.toString(), subtreeCounts?.nodesWithTODO] : query.toString()
+  );
   if (!objectEquals(actual, expectedResult)) {
     t.fail(
       `iterateCollapsed failed:
-  got [${actual.join(', ')}]
-  exp [${expectedResult.join(', ')}]
+  got ${JSON.stringify(actual)}
+  exp ${JSON.stringify(expectedResult)}
 ${tree.toString()}`
     );
   }
 }
 
-g.test('print').fn(async () => {
-  const tree = await LoadingTest.loader.loadTree(new TestQueryMultiFile('suite1', []));
+g.test('print').fn(async t => {
+  const tree = await t.loader.loadTree(new TestQueryMultiFile('suite1', []));
   tree.toString();
 });
 
 g.test('iterateCollapsed').fn(async t => {
-  await testIterateCollapsed(t, 1, [], ['suite1:foo:*', 'suite1:bar,buzz,buzz:*', 'suite1:baz:*']);
+  await testIterateCollapsed(
+    t,
+    1,
+    [],
+    [
+      ['suite1:foo:*', 1], // to-do propagated up from foo:hola
+      ['suite1:bar,buzz,buzz:*', 1], // to-do in file description
+      ['suite1:baz:*', 0],
+    ]
+  );
   await testIterateCollapsed(
     t,
     2,
     [],
     [
-      'suite1:foo:hello:*',
-      'suite1:foo:bonjour:*',
-      'suite1:foo:hola:*',
-      'suite1:bar,buzz,buzz:zap:*',
-      'suite1:baz:wye:*',
-      'suite1:baz:zed:*',
+      ['suite1:foo:hello:*', 0],
+      ['suite1:foo:bonjour:*', 0],
+      ['suite1:foo:hola:*', 1], // to-do in test description
+      ['suite1:bar,buzz,buzz:zap:*', 0],
+      ['suite1:baz:wye:*', 0],
+      ['suite1:baz:zed:*', 0],
     ]
   );
   await testIterateCollapsed(
@@ -695,14 +744,14 @@ g.test('iterateCollapsed').fn(async t => {
     3,
     [],
     [
-      'suite1:foo:hello:',
-      'suite1:foo:bonjour:',
-      'suite1:foo:hola:',
-      'suite1:bar,buzz,buzz:zap:',
-      'suite1:baz:wye:',
-      'suite1:baz:wye:x=1',
-      'suite1:baz:zed:a=1;b=2',
-      'suite1:baz:zed:b=3;a=1',
+      ['suite1:foo:hello:', undefined],
+      ['suite1:foo:bonjour:', undefined],
+      ['suite1:foo:hola:', undefined],
+      ['suite1:bar,buzz,buzz:zap:', undefined],
+      ['suite1:baz:wye:', undefined],
+      ['suite1:baz:wye:x=1', undefined],
+      ['suite1:baz:zed:a=1;b=2', undefined],
+      ['suite1:baz:zed:b=3;a=1', undefined],
     ]
   );
 

@@ -6,22 +6,22 @@
 import * as fs from 'fs';import * as path from 'path';
 
 
-import { validQueryPart } from '../framework/query/validQueryPart.js';
+import { validQueryPart } from '../internal/query/validQueryPart.js';
 
-import { assert, unreachable } from '../framework/util/util.js';
+import { assert, unreachable } from '../util/util.js';
 
 const specFileSuffix = __filename.endsWith('.ts') ? '.spec.ts' : '.spec.js';
 
 async function crawlFilesRecursively(dir) {
   const subpathInfo = await Promise.all(
-  (await fs.promises.readdir(dir)).map(async d => {
+  (await fs.promises.readdir(dir)).map(async (d) => {
     const p = path.join(dir, d);
     const stats = await fs.promises.stat(p);
     return {
       path: p,
       isDirectory: stats.isDirectory(),
-      isFile: stats.isFile() };
-
+      isFile: stats.isFile()
+    };
   }));
 
 
@@ -33,20 +33,17 @@ async function crawlFilesRecursively(dir) {
   i.path.endsWith(`${path.sep}README.txt`) ||
   i.path === 'README.txt')).
 
-  map(i => i.path);
+  map((i) => i.path);
 
   return files.concat(
   await subpathInfo.
-  filter(i => i.isDirectory).
-  map(i => crawlFilesRecursively(i.path)).
+  filter((i) => i.isDirectory).
+  map((i) => crawlFilesRecursively(i.path)).
   reduce(async (a, b) => (await a).concat(await b), Promise.resolve([])));
 
 }
 
-export async function crawl(
-suiteDir,
-validate = true)
-{
+export async function crawl(suiteDir, validate) {
   if (!fs.existsSync(suiteDir)) {
     console.error(`Could not find ${suiteDir}`);
     process.exit(1);
@@ -54,7 +51,7 @@ validate = true)
 
   // Crawl files and convert paths to be POSIX-style, relative to suiteDir.
   const filesToEnumerate = (await crawlFilesRecursively(suiteDir)).
-  map(f => path.relative(suiteDir, f).replace(/\\/g, '/')).
+  map((f) => path.relative(suiteDir, f).replace(/\\/g, '/')).
   sort();
 
   const entries = [];

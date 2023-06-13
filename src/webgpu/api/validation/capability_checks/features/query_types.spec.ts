@@ -2,7 +2,6 @@ export const description = `
 Tests for capability checking for features enabling optional query types.
 `;
 
-import { params, pbool, poptions } from '../../../../../common/framework/params_builder.js';
 import { makeTestGroup } from '../../../../../common/framework/test_group.js';
 import { ValidationTest } from '../../validation_test.js';
 
@@ -11,43 +10,67 @@ export const g = makeTestGroup(ValidationTest);
 g.test('createQuerySet')
   .desc(
     `
-Tests that creating query set shouldn't be valid without the required feature enabled.
-- createQuerySet
-  - type {occlusion, pipeline-statistics, timestamp}
-  - x= {pipeline statistics, timestamp} query {enable, disable}
-
-TODO: This test should expect *synchronous* exceptions, not validation errors, per
-<https://github.com/gpuweb/gpuweb/blob/main/design/ErrorConventions.md>.
-As of this writing, the spec needs to be fixed as well.
+  Tests that creating a query set throws a type error exception if the features don't contain
+  'timestamp-query'.
+    - createQuerySet
+      - type {occlusion, timestamp}
+      - x= {pipeline statistics, timestamp} query {enable, disable}
   `
   )
-  .params(
-    params()
-      .combine(poptions('type', ['occlusion', 'pipeline-statistics', 'timestamp'] as const))
-      .combine(pbool('pipelineStatisticsQueryEnable'))
-      .combine(pbool('timestampQueryEnable'))
+  .params(u =>
+    u
+      .combine('type', ['occlusion', 'timestamp'] as const)
+      .combine('featureContainsTimestampQuery', [false, true])
   )
-  .fn(async t => {
-    const { type, pipelineStatisticsQueryEnable, timestampQueryEnable } = t.params;
+  .beforeAllSubcases(t => {
+    const { featureContainsTimestampQuery } = t.params;
 
-    const nonGuaranteedFeatures: GPUFeatureName[] = [];
-    if (pipelineStatisticsQueryEnable) {
-      nonGuaranteedFeatures.push('pipeline-statistics-query');
-    }
-    if (timestampQueryEnable) {
-      nonGuaranteedFeatures.push('timestamp-query');
+    const requiredFeatures: GPUFeatureName[] = [];
+    if (featureContainsTimestampQuery) {
+      requiredFeatures.push('timestamp-query');
     }
 
-    await t.selectDeviceOrSkipTestCase({ nonGuaranteedFeatures });
+    t.selectDeviceOrSkipTestCase({ requiredFeatures });
+  })
+  .fn(t => {
+    const { type, featureContainsTimestampQuery } = t.params;
 
     const count = 1;
-    const pipelineStatistics =
-      type === 'pipeline-statistics' ? (['clipper-invocations'] as const) : ([] as const);
-    const shouldError =
-      (type === 'pipeline-statistics' && !pipelineStatisticsQueryEnable) ||
-      (type === 'timestamp' && !timestampQueryEnable);
+    const shouldException = type === 'timestamp' && !featureContainsTimestampQuery;
 
-    t.expectValidationError(() => {
-      t.device.createQuerySet({ type, count, pipelineStatistics });
-    }, shouldError);
+    t.shouldThrow(shouldException ? 'TypeError' : false, () => {
+      t.device.createQuerySet({ type, count });
+    });
+  });
+
+g.test('writeTimestamp')
+  .desc(
+    `
+  Tests that writing a timestamp throws a type error exception if the features don't contain
+  'timestamp-query'.
+  `
+  )
+  .params(u => u.combine('featureContainsTimestampQuery', [false, true]))
+  .beforeAllSubcases(t => {
+    const { featureContainsTimestampQuery } = t.params;
+
+    const requiredFeatures: GPUFeatureName[] = [];
+    if (featureContainsTimestampQuery) {
+      requiredFeatures.push('timestamp-query');
+    }
+
+    t.selectDeviceOrSkipTestCase({ requiredFeatures });
+  })
+  .fn(t => {
+    const { featureContainsTimestampQuery } = t.params;
+
+    const querySet = t.device.createQuerySet({
+      type: featureContainsTimestampQuery ? 'timestamp' : 'occlusion',
+      count: 1,
+    });
+    const encoder = t.createEncoder('non-pass');
+
+    t.shouldThrow(featureContainsTimestampQuery ? false : 'TypeError', () => {
+      encoder.encoder.writeTimestamp(querySet, 0);
+    });
   });

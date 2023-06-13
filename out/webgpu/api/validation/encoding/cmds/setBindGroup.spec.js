@@ -10,15 +10,19 @@ TODO: merge these notes and implement.
 >     - x= {compute pass, render pass}
 >     - {null, compatible, incompatible} current pipeline (should have no effect without draw/dispatch)
 >     - setBindGroup in different orders (e.g. 0,1,2 vs 2,0,1)
-`;import { poptions, params, pbool } from '../../../../../common/framework/params_builder.js';
-import { makeTestGroup } from '../../../../../common/framework/test_group.js';
-import { range, unreachable } from '../../../../../common/framework/util/util.js';
-import { kMinDynamicBufferOffsetAlignment } from '../../../../capability_info.js';
+`;import { makeTestGroup } from '../../../../../common/framework/test_group.js';
+import { range, unreachable } from '../../../../../common/util/util.js';
 import {
-kProgrammableEncoderTypes,
+kBufferBindingTypes,
+kMinDynamicBufferOffsetAlignment,
+kLimitInfo } from
+'../../../../capability_info.js';
+import { kResourceStates } from '../../../../gpu_test.js';
+import {
+kProgrammableEncoderTypes } from
 
-ValidationTest } from
-'../../validation_test.js';
+'../../../../util/command_buffer_maker.js';
+import { ValidationTest } from '../../validation_test.js';
 
 class F extends ValidationTest {
   encoderTypeToStageFlag(encoderType) {
@@ -50,14 +54,18 @@ class F extends ValidationTest {
         return {
           buffer: this.createBufferWithState(state, {
             size: 4,
-            usage: GPUBufferUsage.STORAGE }) };
-
-
+            usage: GPUBufferUsage.STORAGE
+          })
+        };
       default:
         unreachable('unknown resource type');}
 
   }
 
+  /**
+   * If state is 'invalid', creates an invalid bind group with valid resources.
+   * If state is 'destroyed', creates a valid bind group with destroyed resources.
+   */
   createBindGroup(
   state,
   resourceType,
@@ -70,95 +78,132 @@ class F extends ValidationTest {
     }
 
     const layout = this.device.createBindGroupLayout({
-      entries: indices.map(binding => ({
+      entries: indices.map((binding) => ({
         binding,
         visibility: this.encoderTypeToStageFlag(encoderType),
-        ...(resourceType === 'buffer' ? { buffer: { type: 'storage' } } : { texture: {} }) })) });
-
-
+        ...(resourceType === 'buffer' ? { buffer: { type: 'storage' } } : { texture: {} })
+      }))
+    });
     const bindGroup = this.device.createBindGroup({
       layout,
-      entries: indices.map(binding => ({
+      entries: indices.map((binding) => ({
         binding,
         resource: this.createBindingResourceWithState(
         resourceType,
-        state === 'destroyed' ? state : 'valid') })) });
+        state === 'destroyed' ? state : 'valid')
 
-
-
+      }))
+    });
 
     if (state === 'invalid') {
-      this.device.popErrorScope();
+      void this.device.popErrorScope();
     }
     return bindGroup;
-  }}
-
+  }
+}
 
 export const g = makeTestGroup(F);
 
 g.test('state_and_binding_index').
-desc('Tests that setBindGroup correctly handles {valid, invalid} bindGroups.').
-cases(
-params().
-combine(poptions('encoderType', kProgrammableEncoderTypes)).
-combine(poptions('state', ['valid', 'invalid', 'destroyed'])).
-combine(poptions('resourceType', ['buffer', 'texture']))).
+desc('Tests that setBindGroup correctly handles {valid, invalid, destroyed} bindGroups.').
+params((u) =>
+u.
+combine('encoderType', kProgrammableEncoderTypes).
+combine('state', kResourceStates).
+combine('resourceType', ['buffer', 'texture'])).
 
-fn(async t => {
+fn((t) => {
   const { encoderType, state, resourceType } = t.params;
-  const maxBindGroups = t.device.limits?.maxBindGroups ?? 4;
+  const maxBindGroups = t.device.limits.maxBindGroups;
 
-  async function runTest(index) {
-    const { encoder, finish } = t.createEncoder(encoderType);
+  function runTest(index) {
+    const { encoder, validateFinishAndSubmit } = t.createEncoder(encoderType);
     encoder.setBindGroup(index, t.createBindGroup(state, resourceType, encoderType, [index]));
 
-    const shouldError = index >= maxBindGroups;
-
-    if (!shouldError && state === 'destroyed') {
-      t.device.pushErrorScope('validation');
-      const commandBuffer = finish();
-      const error = await t.device.popErrorScope();
-      t.expect(error === null, `finish() should not fail, but failed with ${error}`);
-      t.expectValidationError(() => {
-        t.queue.submit([commandBuffer]);
-      });
-    } else {
-      t.expectValidationError(() => {
-        t.debug('here');
-        finish();
-      }, shouldError || state !== 'valid');
-    }
+    validateFinishAndSubmit(state !== 'invalid' && index < maxBindGroups, state !== 'destroyed');
   }
 
-  // TODO: move to subcases() once we can query the device limits
+  // MAINTENANCE_TODO: move to subcases() once we can query the device limits
   for (const index of [1, maxBindGroups - 1, maxBindGroups]) {
     t.debug(`test bind group index ${index}`);
-    await runTest(index);
+    runTest(index);
   }
+});
+
+g.test('bind_group,device_mismatch').
+desc(
+`
+    Tests setBindGroup cannot be called with a bind group created from another device
+    - x= setBindGroup {sequence overload, Uint32Array overload}
+    `).
+
+params((u) =>
+u.
+combine('encoderType', kProgrammableEncoderTypes).
+beginSubcases().
+combine('useU32Array', [true, false]).
+combine('mismatched', [true, false])).
+
+beforeAllSubcases((t) => {
+  t.selectMismatchedDeviceOrSkipTestCase(undefined);
+}).
+fn((t) => {
+  const { encoderType, useU32Array, mismatched } = t.params;
+  const sourceDevice = mismatched ? t.mismatchedDevice : t.device;
+
+  const buffer = sourceDevice.createBuffer({
+    size: 4,
+    usage: GPUBufferUsage.STORAGE
+  });
+
+  const layout = sourceDevice.createBindGroupLayout({
+    entries: [
+    {
+      binding: 0,
+      visibility: t.encoderTypeToStageFlag(encoderType),
+      buffer: { type: 'storage', hasDynamicOffset: useU32Array }
+    }]
+
+  });
+
+  const bindGroup = sourceDevice.createBindGroup({
+    layout,
+    entries: [
+    {
+      binding: 0,
+      resource: { buffer }
+    }]
+
+  });
+
+  const { encoder, validateFinish } = t.createEncoder(encoderType);
+  if (useU32Array) {
+    encoder.setBindGroup(0, bindGroup, new Uint32Array([0]), 0, 1);
+  } else {
+    encoder.setBindGroup(0, bindGroup);
+  }
+  validateFinish(!mismatched);
 });
 
 g.test('dynamic_offsets_passed_but_not_expected').
 desc('Tests that setBindGroup correctly errors on unexpected dynamicOffsets.').
-cases(poptions('encoderType', kProgrammableEncoderTypes)).
-fn(async t => {
+params((u) => u.combine('encoderType', kProgrammableEncoderTypes)).
+fn((t) => {
   const { encoderType } = t.params;
   const bindGroup = t.createBindGroup('valid', 'buffer', encoderType, []);
   const dynamicOffsets = [0];
 
-  const { encoder, finish } = t.createEncoder(encoderType);
+  const { encoder, validateFinish } = t.createEncoder(encoderType);
   encoder.setBindGroup(0, bindGroup, dynamicOffsets);
-
-  t.expectValidationError(() => {
-    finish();
-  });
+  validateFinish(false);
 });
 
 g.test('dynamic_offsets_match_expectations_in_pass_encoder').
 desc('Tests that given dynamicOffsets match the specified bindGroup.').
-cases(
-params().
-combine(poptions('encoderType', kProgrammableEncoderTypes)).
-combine([
+params((u) =>
+u.
+combine('encoderType', kProgrammableEncoderTypes).
+combineWithParams([
 { dynamicOffsets: [256, 0], _success: true }, // Dynamic offsets aligned
 { dynamicOffsets: [1, 2], _success: false }, // Dynamic offsets not aligned
 
@@ -177,10 +222,10 @@ combine([
 { dynamicOffsets: [0, 1024], _success: false },
 { dynamicOffsets: [0, 0xffffffff], _success: false }]).
 
-combine(pbool('useU32array'))).
+combine('useU32array', [false, true])).
 
-fn(async t => {
-  const kBindingSize = 9;
+fn((t) => {
+  const kBindingSize = 12;
 
   const bindGroupLayout = t.device.createBindGroupLayout({
     entries: [
@@ -189,29 +234,29 @@ fn(async t => {
       visibility: GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT,
       buffer: {
         type: 'uniform',
-        hasDynamicOffset: true } },
-
-
+        hasDynamicOffset: true
+      }
+    },
     {
       binding: 1,
       visibility: GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT,
       buffer: {
         type: 'storage',
-        hasDynamicOffset: true } }] });
+        hasDynamicOffset: true
+      }
+    }]
 
-
-
-
+  });
 
   const uniformBuffer = t.device.createBuffer({
     size: 2 * kMinDynamicBufferOffsetAlignment + 8,
-    usage: GPUBufferUsage.UNIFORM });
-
+    usage: GPUBufferUsage.UNIFORM
+  });
 
   const storageBuffer = t.device.createBuffer({
     size: 2 * kMinDynamicBufferOffsetAlignment + 8,
-    usage: GPUBufferUsage.STORAGE });
-
+    usage: GPUBufferUsage.STORAGE
+  });
 
   const bindGroup = t.device.createBindGroup({
     layout: bindGroupLayout,
@@ -220,109 +265,183 @@ fn(async t => {
       binding: 0,
       resource: {
         buffer: uniformBuffer,
-        size: kBindingSize } },
-
-
+        size: kBindingSize
+      }
+    },
     {
       binding: 1,
       resource: {
         buffer: storageBuffer,
-        size: kBindingSize } }] });
+        size: kBindingSize
+      }
+    }]
 
-
-
-
+  });
 
   const { encoderType, dynamicOffsets, useU32array, _success } = t.params;
 
-  const { encoder, finish } = t.createEncoder(encoderType);
+  const { encoder, validateFinish } = t.createEncoder(encoderType);
   if (useU32array) {
     encoder.setBindGroup(0, bindGroup, new Uint32Array(dynamicOffsets), 0, dynamicOffsets.length);
   } else {
     encoder.setBindGroup(0, bindGroup, dynamicOffsets);
   }
-
-  t.expectValidationError(() => {
-    finish();
-  }, !_success);
+  validateFinish(_success);
 });
 
 g.test('u32array_start_and_length').
 desc('Tests that dynamicOffsetsData(Start|Length) apply to the given Uint32Array.').
-subcases(() => [
+paramsSubcasesOnly([
 // dynamicOffsetsDataLength > offsets.length
 {
   offsets: [0],
   dynamicOffsetsDataStart: 0,
   dynamicOffsetsDataLength: 2,
-  _success: false },
-
+  _success: false
+},
 // dynamicOffsetsDataStart + dynamicOffsetsDataLength > offsets.length
 {
   offsets: [0],
   dynamicOffsetsDataStart: 1,
   dynamicOffsetsDataLength: 1,
-  _success: false },
-
+  _success: false
+},
 {
   offsets: [0, 0],
   dynamicOffsetsDataStart: 1,
   dynamicOffsetsDataLength: 1,
-  _success: true },
-
+  _success: true
+},
 {
   offsets: [0, 0, 0],
   dynamicOffsetsDataStart: 1,
   dynamicOffsetsDataLength: 1,
-  _success: true },
-
+  _success: true
+},
 {
   offsets: [0, 0],
   dynamicOffsetsDataStart: 0,
   dynamicOffsetsDataLength: 2,
-  _success: true }]).
+  _success: true
+}]).
 
-
-fn(t => {
+fn((t) => {
   const { offsets, dynamicOffsetsDataStart, dynamicOffsetsDataLength, _success } = t.params;
   const kBindingSize = 8;
 
   const bindGroupLayout = t.device.createBindGroupLayout({
-    entries: range(dynamicOffsetsDataLength, i => ({
+    entries: range(dynamicOffsetsDataLength, (i) => ({
       binding: i,
       visibility: GPUShaderStage.FRAGMENT,
       buffer: {
         type: 'storage',
-        hasDynamicOffset: true } })) });
-
-
-
+        hasDynamicOffset: true
+      }
+    }))
+  });
 
   const bindGroup = t.device.createBindGroup({
     layout: bindGroupLayout,
-    entries: range(dynamicOffsetsDataLength, i => ({
+    entries: range(dynamicOffsetsDataLength, (i) => ({
       binding: i,
       resource: {
         buffer: t.createBufferWithState('valid', {
           size: kBindingSize,
-          usage: GPUBufferUsage.STORAGE }),
+          usage: GPUBufferUsage.STORAGE
+        }),
+        size: kBindingSize
+      }
+    }))
+  });
 
-        size: kBindingSize } })) });
+  const { encoder, validateFinish } = t.createEncoder('render pass');
+
+  const doSetBindGroup = () => {
+    encoder.setBindGroup(
+    0,
+    bindGroup,
+    new Uint32Array(offsets),
+    dynamicOffsetsDataStart,
+    dynamicOffsetsDataLength);
+
+  };
+
+  if (_success) {
+    doSetBindGroup();
+  } else {
+    t.shouldThrow('RangeError', doSetBindGroup);
+  }
+
+  // RangeError in setBindGroup does not cause the encoder to become invalid.
+  validateFinish(true);
+});
+
+g.test('buffer_dynamic_offsets').
+desc(
+`
+    Test that the dynamic offsets of the BufferLayout is a multiple of
+    'minUniformBufferOffsetAlignment|minStorageBufferOffsetAlignment' if the BindGroup entry defines
+    buffer and the buffer type is 'uniform|storage|read-only-storage'.
+  `).
+
+params((u) =>
+u //
+.combine('type', kBufferBindingTypes).
+combine('encoderType', kProgrammableEncoderTypes).
+beginSubcases().
+expand('dynamicOffset', ({ type }) =>
+type === 'uniform' ?
+[
+kLimitInfo.minUniformBufferOffsetAlignment.default,
+kLimitInfo.minUniformBufferOffsetAlignment.default * 0.5,
+kLimitInfo.minUniformBufferOffsetAlignment.default * 1.5,
+kLimitInfo.minUniformBufferOffsetAlignment.default * 2,
+kLimitInfo.minUniformBufferOffsetAlignment.default + 2] :
+
+[
+kLimitInfo.minStorageBufferOffsetAlignment.default,
+kLimitInfo.minStorageBufferOffsetAlignment.default * 0.5,
+kLimitInfo.minStorageBufferOffsetAlignment.default * 1.5,
+kLimitInfo.minStorageBufferOffsetAlignment.default * 2,
+kLimitInfo.minStorageBufferOffsetAlignment.default + 2])).
 
 
 
+fn((t) => {
+  const { type, dynamicOffset, encoderType } = t.params;
+  const kBindingSize = 12;
 
-  const { encoder, finish } = t.createEncoder('render pass');
-  encoder.setBindGroup(
-  0,
-  bindGroup,
-  new Uint32Array(offsets),
-  dynamicOffsetsDataStart,
-  dynamicOffsetsDataLength);
+  const bindGroupLayout = t.device.createBindGroupLayout({
+    entries: [
+    {
+      binding: 0,
+      visibility: GPUShaderStage.COMPUTE,
+      buffer: { type, hasDynamicOffset: true }
+    }]
 
+  });
 
-  t.expectValidationError(() => {
-    finish();
-  }, !_success);
+  let usage, isValid;
+  if (type === 'uniform') {
+    usage = GPUBufferUsage.UNIFORM;
+    isValid = dynamicOffset % kLimitInfo.minUniformBufferOffsetAlignment.default === 0;
+  } else {
+    usage = GPUBufferUsage.STORAGE;
+    isValid = dynamicOffset % kLimitInfo.minStorageBufferOffsetAlignment.default === 0;
+  }
+
+  const buffer = t.device.createBuffer({
+    size: 3 * kMinDynamicBufferOffsetAlignment,
+    usage
+  });
+
+  const bindGroup = t.device.createBindGroup({
+    entries: [{ binding: 0, resource: { buffer, size: kBindingSize } }],
+    layout: bindGroupLayout
+  });
+
+  const { encoder, validateFinish } = t.createEncoder(encoderType);
+  encoder.setBindGroup(0, bindGroup, [dynamicOffset]);
+  validateFinish(isValid);
 });
 //# sourceMappingURL=setBindGroup.spec.js.map

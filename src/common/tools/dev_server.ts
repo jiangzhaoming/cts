@@ -7,6 +7,7 @@ import * as chokidar from 'chokidar';
 import * as express from 'express';
 import * as morgan from 'morgan';
 import * as portfinder from 'portfinder';
+import * as serveIndex from 'serve-index';
 
 import { makeListing } from './crawl.js';
 
@@ -90,6 +91,15 @@ watcher.on('change', dirtyCompileCache);
 
 const app = express();
 
+// Send Chrome Origin Trial tokens
+app.use((req, res, next) => {
+  res.header('Origin-Trial', [
+    // Token for http://localhost:8080
+    'AvyDIV+RJoYs8fn3W6kIrBhWw0te0klraoz04mw/nPb8VTus3w5HCdy+vXqsSzomIH745CT6B5j1naHgWqt/tw8AAABJeyJvcmlnaW4iOiJodHRwOi8vbG9jYWxob3N0OjgwODAiLCJmZWF0dXJlIjoiV2ViR1BVIiwiZXhwaXJ5IjoxNjYzNzE4Mzk5fQ==',
+  ]);
+  next();
+});
+
 // Set up logging
 app.use(morgan('dev'));
 
@@ -97,6 +107,7 @@ app.use(morgan('dev'));
 app.use('/standalone', express.static(path.resolve(srcDir, '../standalone')));
 // Add out-wpt/ build dir for convenience
 app.use('/out-wpt', express.static(path.resolve(srcDir, '../out-wpt')));
+app.use('/docs/tsdoc', express.static(path.resolve(srcDir, '../docs/tsdoc')));
 
 // Serve a suite's listing.js file by crawling the filesystem for all tests.
 app.get('/out/:suite/listing.js', async (req, res, next) => {
@@ -122,14 +133,19 @@ app.get('/out/:suite/listing.js', async (req, res, next) => {
 
 // Serve all other .js files by fetching the source .ts file and compiling it.
 app.get('/out/**/*.js', async (req, res, next) => {
-  const tsUrl = path.relative('/out', req.url).replace(/\.js$/, '.ts');
+  const jsUrl = path.relative('/out', req.url);
+  const tsUrl = jsUrl.replace(/\.js$/, '.ts');
   if (compileCache.has(tsUrl)) {
     res.setHeader('Content-Type', 'application/javascript');
     res.send(compileCache.get(tsUrl));
     return;
   }
 
-  const absPath = path.join(srcDir, tsUrl);
+  let absPath = path.join(srcDir, tsUrl);
+  if (!fs.existsSync(absPath)) {
+    // The .ts file doesn't exist. Try .js file in case this is a .js/.d.ts pair.
+    absPath = path.join(srcDir, jsUrl);
+  }
 
   try {
     const result = await babel.transformFileAsync(absPath, babelConfig);
@@ -169,4 +185,5 @@ portfinder.getPort({ host, port }, (err, port) => {
 });
 
 // Serve everything else (not .js) as static, and directories as directory listings.
+app.use('/out', serveIndex(path.resolve(srcDir, '../src')));
 app.use('/out', express.static(path.resolve(srcDir, '../src')));

@@ -1,337 +1,217 @@
+// MAINTENANCE_TODO: The generated Typedoc for this file is hard to navigate because it's
+// alphabetized. Consider using namespaces or renames to fix this?
+
 /* eslint-disable no-sparse-arrays */
-import {
-  assertTypeTrue,
-  ResolveType,
-  TypeEqual,
-  ZipKeysWithValues,
-} from '../common/framework/util/types.js';
-import { assert, unreachable } from '../common/framework/util/util.js';
 
-import { GPUConst } from './constants.js';
+import { keysOf, makeTable, numericKeysOf, valueof } from '../common/util/data_tables.js';
+import { assertTypeTrue, TypeEqual } from '../common/util/types.js';
+import { unreachable } from '../common/util/util.js';
 
-type valueof<K> = K[keyof K];
+import { GPUConst, kMaxUnsignedLongValue, kMaxUnsignedLongLongValue } from './constants.js';
 
-function keysOf<T extends string>(obj: { [k in T]: unknown }): readonly T[] {
-  return (Object.keys(obj) as unknown[]) as T[];
-}
-
-function numericKeysOf<T>(obj: object): readonly T[] {
-  return (Object.keys(obj).map(n => Number(n)) as unknown[]) as T[];
-}
-
-/**
- * Creates an info lookup object from a more nicely-formatted table. See below for examples.
- *
- * Note: Using `as const` on the arguments to this function is necessary to infer the correct type.
- */
-function makeTable<
-  Members extends readonly string[],
-  Defaults extends readonly unknown[],
-  Table extends { readonly [k: string]: readonly unknown[] }
->(
-  members: Members,
-  defaults: Defaults,
-  table: Table
-): {
-  readonly [k in keyof Table]: ResolveType<ZipKeysWithValues<Members, Table[k], Defaults>>;
-} {
-  const result: { [k: string]: { [m: string]: unknown } } = {};
-  for (const [k, v] of Object.entries<readonly unknown[]>(table)) {
-    const item: { [m: string]: unknown } = {};
-    for (let i = 0; i < members.length; ++i) {
-      item[members[i]] = v[i] ?? defaults[i];
-    }
-    result[k] = item;
-  }
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  return result as any;
-}
+// Base device limits can be found in constants.ts.
 
 // Queries
 
-export const kMaxQueryCount = 8192;
+/** Maximum number of queries in GPUQuerySet, by spec. */
+export const kMaxQueryCount = 4096;
+/** Per-GPUQueryType info. */
+export type QueryTypeInfo = {
+  /** Optional feature required to use this GPUQueryType. */
+  readonly feature: GPUFeatureName | undefined;
+  // Add fields as needed
+};
 export const kQueryTypeInfo: {
-  readonly [k in GPUQueryType]: {
-    readonly feature: GPUFeatureName | undefined;
-  };
+  readonly [k in GPUQueryType]: QueryTypeInfo;
 } = /* prettier-ignore */ {
   // Occlusion query does not require any features.
   'occlusion':           { feature:  undefined },
-  'pipeline-statistics': { feature: 'pipeline-statistics-query' },
   'timestamp':           { feature: 'timestamp-query' },
 };
+/** List of all GPUQueryType values. */
 export const kQueryTypes = keysOf(kQueryTypeInfo);
 
 // Buffers
 
+/** Required alignment of a GPUBuffer size, by spec. */
 export const kBufferSizeAlignment = 4;
 
-export const kBufferUsageInfo: {
-  readonly [k in valueof<typeof GPUConst.BufferUsage>]: {};
+/** Per-GPUBufferUsage copy info. */
+export const kBufferUsageCopyInfo: {
+  readonly [name: string]: GPUBufferUsageFlags;
 } = /* prettier-ignore */ {
-  [GPUConst.BufferUsage.MAP_READ]:      {},
-  [GPUConst.BufferUsage.MAP_WRITE]:     {},
-  [GPUConst.BufferUsage.COPY_SRC]:      {},
-  [GPUConst.BufferUsage.COPY_DST]:      {},
-  [GPUConst.BufferUsage.INDEX]:         {},
-  [GPUConst.BufferUsage.VERTEX]:        {},
-  [GPUConst.BufferUsage.UNIFORM]:       {},
-  [GPUConst.BufferUsage.STORAGE]:       {},
-  [GPUConst.BufferUsage.INDIRECT]:      {},
-  [GPUConst.BufferUsage.QUERY_RESOLVE]: {},
+  'COPY_NONE':    0,
+  'COPY_SRC':     GPUConst.BufferUsage.COPY_SRC,
+  'COPY_DST':     GPUConst.BufferUsage.COPY_DST,
+  'COPY_SRC_DST': GPUConst.BufferUsage.COPY_SRC | GPUConst.BufferUsage.COPY_DST,
 };
-export const kBufferUsages = numericKeysOf<GPUBufferUsageFlags>(kBufferUsageInfo);
+/** List of all GPUBufferUsage copy values. */
+export const kBufferUsageCopy = keysOf(kBufferUsageCopyInfo);
 
-// Textures
+/** Per-GPUBufferUsage keys and info. */
+type BufferUsageKey = keyof typeof GPUConst.BufferUsage;
+export const kBufferUsageKeys = keysOf(GPUConst.BufferUsage);
+export const kBufferUsageInfo: {
+  readonly [k in BufferUsageKey]: GPUBufferUsageFlags;
+} = {
+  ...GPUConst.BufferUsage,
+};
 
-// Note that we repeat the header multiple times in order to make it easier to read.
-export const kRegularTextureFormatInfo = /* prettier-ignore */ makeTable(
-                           ['renderable', 'multisample', 'color', 'depth', 'stencil', 'storage', 'copySrc', 'copyDst', 'bytesPerBlock', 'blockWidth', 'blockHeight',                'feature'] as const,
-                           [            ,              ,    true,   false,     false,          ,      true,      true,                ,            1,             1,                         ] as const, {
-  // 8-bit formats
-  'r8unorm':               [        true,          true,        ,        ,          ,     false,          ,          ,               1],
-  'r8snorm':               [       false,         false,        ,        ,          ,     false,          ,          ,               1],
-  'r8uint':                [        true,          true,        ,        ,          ,     false,          ,          ,               1],
-  'r8sint':                [        true,          true,        ,        ,          ,     false,          ,          ,               1],
-  // 16-bit formats
-  'r16uint':               [        true,          true,        ,        ,          ,     false,          ,          ,               2],
-  'r16sint':               [        true,          true,        ,        ,          ,     false,          ,          ,               2],
-  'r16float':              [        true,          true,        ,        ,          ,     false,          ,          ,               2],
-  'rg8unorm':              [        true,          true,        ,        ,          ,     false,          ,          ,               2],
-  'rg8snorm':              [       false,         false,        ,        ,          ,     false,          ,          ,               2],
-  'rg8uint':               [        true,          true,        ,        ,          ,     false,          ,          ,               2],
-  'rg8sint':               [        true,          true,        ,        ,          ,     false,          ,          ,               2],
-  // 32-bit formats
-  'r32uint':               [        true,          true,        ,        ,          ,      true,          ,          ,               4],
-  'r32sint':               [        true,          true,        ,        ,          ,      true,          ,          ,               4],
-  'r32float':              [        true,          true,        ,        ,          ,      true,          ,          ,               4],
-  'rg16uint':              [        true,          true,        ,        ,          ,     false,          ,          ,               4],
-  'rg16sint':              [        true,          true,        ,        ,          ,     false,          ,          ,               4],
-  'rg16float':             [        true,          true,        ,        ,          ,     false,          ,          ,               4],
-  'rgba8unorm':            [        true,          true,        ,        ,          ,      true,          ,          ,               4],
-  'rgba8unorm-srgb':       [        true,          true,        ,        ,          ,     false,          ,          ,               4],
-  'rgba8snorm':            [       false,         false,        ,        ,          ,      true,          ,          ,               4],
-  'rgba8uint':             [        true,          true,        ,        ,          ,      true,          ,          ,               4],
-  'rgba8sint':             [        true,          true,        ,        ,          ,      true,          ,          ,               4],
-  'bgra8unorm':            [        true,          true,        ,        ,          ,     false,          ,          ,               4],
-  'bgra8unorm-srgb':       [        true,          true,        ,        ,          ,     false,          ,          ,               4],
-  // Packed 32-bit formats
-  'rgb10a2unorm':          [        true,          true,        ,        ,          ,     false,          ,          ,               4],
-  'rg11b10ufloat':         [       false,         false,        ,        ,          ,     false,          ,          ,               4],
-  'rgb9e5ufloat':          [       false,         false,        ,        ,          ,     false,          ,          ,               4],
-  // 64-bit formats
-  'rg32uint':              [        true,          true,        ,        ,          ,      true,          ,          ,               8],
-  'rg32sint':              [        true,          true,        ,        ,          ,      true,          ,          ,               8],
-  'rg32float':             [        true,          true,        ,        ,          ,      true,          ,          ,               8],
-  'rgba16uint':            [        true,          true,        ,        ,          ,      true,          ,          ,               8],
-  'rgba16sint':            [        true,          true,        ,        ,          ,      true,          ,          ,               8],
-  'rgba16float':           [        true,          true,        ,        ,          ,      true,          ,          ,               8],
-  // 128-bit formats
-  'rgba32uint':            [        true,          true,        ,        ,          ,      true,          ,          ,              16],
-  'rgba32sint':            [        true,          true,        ,        ,          ,      true,          ,          ,              16],
-  'rgba32float':           [        true,          true,        ,        ,          ,      true,          ,          ,              16],
-} as const);
-/* prettier-ignore */
-const kTexFmtInfoHeader =  ['renderable', 'multisample', 'color', 'depth', 'stencil', 'storage', 'copySrc', 'copyDst', 'bytesPerBlock', 'blockWidth', 'blockHeight',                'feature'] as const;
-export const kSizedDepthStencilFormatInfo = /* prettier-ignore */ makeTable(kTexFmtInfoHeader,
-                           [        true,          true,   false,        ,          ,     false,     false,     false,                ,            1,             1,                         ] as const, {
-  'depth32float':          [            ,              ,        ,    true,     false,          ,          ,          ,               4],
-  'depth16unorm':          [            ,              ,        ,    true,     false,          ,          ,          ,               2],
-  'stencil8':              [            ,              ,        ,   false,      true,          ,          ,          ,               1],
-} as const);
-export const kUnsizedDepthStencilFormatInfo = /* prettier-ignore */ makeTable(kTexFmtInfoHeader,
-                           [        true,          true,   false,        ,          ,     false,     false,     false,       undefined,            1,             1,                         ] as const, {
-  'depth24plus':           [            ,              ,        ,    true,     false,          ,          ,          ],
-  'depth24plus-stencil8':  [            ,              ,        ,    true,      true,          ,          ,          ],
-  // bytesPerBlock only makes sense on a per-aspect basis. But this table can't express that. So we put depth24unorm-stencil8 and depth32float-stencil8 to be unsized formats for now.
-  'depth24unorm-stencil8': [            ,              ,        ,    true,      true,          ,          ,          ,                ,             ,              ,  'depth24unorm-stencil8'],
-  'depth32float-stencil8': [            ,              ,        ,    true,      true,          ,          ,          ,                ,             ,              ,  'depth32float-stencil8'],
-} as const);
-export const kCompressedTextureFormatInfo = /* prettier-ignore */ makeTable(kTexFmtInfoHeader,
-                           [       false,         false,    true,   false,     false,     false,      true,      true,                ,            4,             4,                         ] as const, {
-  'bc1-rgba-unorm':        [            ,              ,        ,        ,          ,          ,          ,          ,               8,            4,             4, 'texture-compression-bc'],
-  'bc1-rgba-unorm-srgb':   [            ,              ,        ,        ,          ,          ,          ,          ,               8,            4,             4, 'texture-compression-bc'],
-  'bc2-rgba-unorm':        [            ,              ,        ,        ,          ,          ,          ,          ,              16,            4,             4, 'texture-compression-bc'],
-  'bc2-rgba-unorm-srgb':   [            ,              ,        ,        ,          ,          ,          ,          ,              16,            4,             4, 'texture-compression-bc'],
-  'bc3-rgba-unorm':        [            ,              ,        ,        ,          ,          ,          ,          ,              16,            4,             4, 'texture-compression-bc'],
-  'bc3-rgba-unorm-srgb':   [            ,              ,        ,        ,          ,          ,          ,          ,              16,            4,             4, 'texture-compression-bc'],
-  'bc4-r-unorm':           [            ,              ,        ,        ,          ,          ,          ,          ,               8,            4,             4, 'texture-compression-bc'],
-  'bc4-r-snorm':           [            ,              ,        ,        ,          ,          ,          ,          ,               8,            4,             4, 'texture-compression-bc'],
-  'bc5-rg-unorm':          [            ,              ,        ,        ,          ,          ,          ,          ,              16,            4,             4, 'texture-compression-bc'],
-  'bc5-rg-snorm':          [            ,              ,        ,        ,          ,          ,          ,          ,              16,            4,             4, 'texture-compression-bc'],
-  'bc6h-rgb-ufloat':       [            ,              ,        ,        ,          ,          ,          ,          ,              16,            4,             4, 'texture-compression-bc'],
-  'bc6h-rgb-float':        [            ,              ,        ,        ,          ,          ,          ,          ,              16,            4,             4, 'texture-compression-bc'],
-  'bc7-rgba-unorm':        [            ,              ,        ,        ,          ,          ,          ,          ,              16,            4,             4, 'texture-compression-bc'],
-  'bc7-rgba-unorm-srgb':   [            ,              ,        ,        ,          ,          ,          ,          ,              16,            4,             4, 'texture-compression-bc'],
-} as const);
+/** List of all GPUBufferUsage values. */
+export const kBufferUsages = Object.values(GPUConst.BufferUsage);
+export const kAllBufferUsageBits = kBufferUsages.reduce(
+  (previousSet, currentUsage) => previousSet | currentUsage,
+  0
+);
 
-export type RegularTextureFormat = keyof typeof kRegularTextureFormatInfo;
-export type SizedDepthStencilFormat = keyof typeof kSizedDepthStencilFormatInfo;
-export type UnsizedDepthStencilFormat = keyof typeof kUnsizedDepthStencilFormatInfo;
-export type CompressedTextureFormat = keyof typeof kCompressedTextureFormatInfo;
+// Errors
 
-export const kRegularTextureFormats = keysOf(kRegularTextureFormatInfo);
-export const kSizedDepthStencilFormats = keysOf(kSizedDepthStencilFormatInfo);
-export const kUnsizedDepthStencilFormats = keysOf(kUnsizedDepthStencilFormatInfo);
-export const kCompressedTextureFormats = keysOf(kCompressedTextureFormatInfo);
-
-export const kColorTextureFormatInfo = {
-  ...kRegularTextureFormatInfo,
-  ...kCompressedTextureFormatInfo,
-} as const;
-export type ColorTextureFormat = keyof typeof kColorTextureFormatInfo;
-export const kColorTextureFormats = keysOf(kColorTextureFormatInfo);
-
-export const kEncodableTextureFormatInfo = {
-  ...kRegularTextureFormatInfo,
-  ...kSizedDepthStencilFormatInfo,
-} as const;
-export type EncodableTextureFormat = keyof typeof kEncodableTextureFormatInfo;
-export const kEncodableTextureFormats = keysOf(kEncodableTextureFormatInfo);
-
-export const kSizedTextureFormatInfo = {
-  ...kRegularTextureFormatInfo,
-  ...kSizedDepthStencilFormatInfo,
-  ...kCompressedTextureFormatInfo,
-} as const;
-export type SizedTextureFormat = keyof typeof kSizedTextureFormatInfo;
-export const kSizedTextureFormats = keysOf(kSizedTextureFormatInfo);
-
-export const kDepthStencilFormatInfo = {
-  ...kSizedDepthStencilFormatInfo,
-  ...kUnsizedDepthStencilFormatInfo,
-} as const;
-export type DepthStencilFormat = keyof typeof kDepthStencilFormatInfo;
-export const kDepthStencilFormats = keysOf(kDepthStencilFormatInfo);
-
-export const kUncompressedTextureFormatInfo = {
-  ...kRegularTextureFormatInfo,
-  ...kSizedDepthStencilFormatInfo,
-  ...kUnsizedDepthStencilFormatInfo,
-} as const;
-export type UncompressedTextureFormat = keyof typeof kUncompressedTextureFormatInfo;
-export const kUncompressedTextureFormats = keysOf(kUncompressedTextureFormatInfo);
-
-export const kAllTextureFormatInfo = {
-  ...kUncompressedTextureFormatInfo,
-  ...kCompressedTextureFormatInfo,
-} as const;
-export const kAllTextureFormats = keysOf(kAllTextureFormatInfo);
-// Assert every GPUTextureFormat is covered by one of the tables.
-((x: { readonly [k in GPUTextureFormat]: {} }) => x)(kAllTextureFormatInfo);
-
-export const kTextureDimensionInfo: {
-  readonly [k in GPUTextureDimension]: {
-    // Add fields as needed
+/** Per-GPUErrorFilter info. */
+export const kErrorScopeFilterInfo: {
+  readonly [k in GPUErrorFilter]: {
+    generatable: boolean;
   };
+} = /* prettier-ignore */ {
+  'internal':      { generatable: false },
+  'out-of-memory': { generatable: true },
+  'validation':    { generatable: true },
+};
+/** List of all GPUErrorFilter values. */
+export const kErrorScopeFilters = keysOf(kErrorScopeFilterInfo);
+export const kGeneratableErrorScopeFilters = kErrorScopeFilters.filter(
+  e => kErrorScopeFilterInfo[e].generatable
+);
+
+// Canvases
+
+// The formats of GPUTextureFormat for canvas context.
+export const kCanvasTextureFormats = ['bgra8unorm', 'rgba8unorm', 'rgba16float'] as const;
+
+// The alpha mode for canvas context.
+export const kCanvasAlphaModesInfo: {
+  readonly [k in GPUCanvasAlphaMode]: {};
+} = /* prettier-ignore */ {
+  'opaque': {},
+  'premultiplied': {},
+};
+export const kCanvasAlphaModes = keysOf(kCanvasAlphaModesInfo);
+
+// The color spaces for canvas context
+export const kCanvasColorSpacesInfo: {
+  readonly [k in PredefinedColorSpace]: {};
+} = /* prettier-ignore */ {
+  'srgb': {},
+  'display-p3': {},
+};
+export const kCanvasColorSpaces = keysOf(kCanvasColorSpacesInfo);
+
+// Textures (except for texture format info)
+
+/** Per-GPUTextureDimension info. */
+export const kTextureDimensionInfo: {
+  readonly [k in GPUTextureDimension]: {};
 } = /* prettier-ignore */ {
   '1d': {},
   '2d': {},
   '3d': {},
 };
+/** List of all GPUTextureDimension values. */
 export const kTextureDimensions = keysOf(kTextureDimensionInfo);
 
+/** Per-GPUTextureAspect info. */
 export const kTextureAspectInfo: {
-  readonly [k in GPUTextureAspect]: {
-    // Add fields as needed
-  };
+  readonly [k in GPUTextureAspect]: {};
 } = /* prettier-ignore */ {
   'all': {},
   'depth-only': {},
   'stencil-only': {},
 };
+/** List of all GPUTextureAspect values. */
 export const kTextureAspects = keysOf(kTextureAspectInfo);
 
-const kDepthStencilFormatCapabilityInBufferTextureCopy = {
-  // kUnsizedDepthStencilFormats
-  depth24plus: {
-    CopyB2T: [],
-    CopyT2B: [],
-    texelAspectSize: { 'depth-only': -1, 'stencil-only': -1 },
-  },
-  'depth24plus-stencil8': {
-    CopyB2T: ['stencil-only'],
-    CopyT2B: ['stencil-only'],
-    texelAspectSize: { 'depth-only': -1, 'stencil-only': 1 },
-  },
+// Misc
 
-  // kSizedDepthStencilFormats
-  depth16unorm: {
-    CopyB2T: ['all', 'depth-only'],
-    CopyT2B: ['all', 'depth-only'],
-    texelAspectSize: { 'depth-only': 2, 'stencil-only': -1 },
-  },
-  depth32float: {
-    CopyB2T: [],
-    CopyT2B: ['all', 'depth-only'],
-    texelAspectSize: { 'depth-only': 4, 'stencil-only': -1 },
-  },
-  'depth24unorm-stencil8': {
-    CopyB2T: ['stencil-only'],
-    CopyT2B: ['depth-only', 'stencil-only'],
-    texelAspectSize: { 'depth-only': 4, 'stencil-only': 1 },
-  },
-  'depth32float-stencil8': {
-    CopyB2T: ['stencil-only'],
-    CopyT2B: ['depth-only', 'stencil-only'],
-    texelAspectSize: { 'depth-only': 4, 'stencil-only': 1 },
-  },
-  stencil8: {
-    CopyB2T: ['all', 'stencil-only'],
-    CopyT2B: ['all', 'stencil-only'],
-    texelAspectSize: { 'depth-only': -1, 'stencil-only': 1 },
-  },
-} as const;
+/** Per-GPUCompareFunction info. */
+export const kCompareFunctionInfo: {
+  readonly [k in GPUCompareFunction]: {};
+} = /* prettier-ignore */ {
+  'never': {},
+  'less': {},
+  'equal': {},
+  'less-equal': {},
+  'greater': {},
+  'not-equal': {},
+  'greater-equal': {},
+  'always': {},
+};
+/** List of all GPUCompareFunction values. */
+export const kCompareFunctions = keysOf(kCompareFunctionInfo);
 
-export function depthStencilBufferTextureCopySupported(
-  type: 'CopyB2T' | 'CopyT2B',
-  format: DepthStencilFormat,
-  aspect: GPUTextureAspect
-): boolean {
-  const supportedAspects: readonly GPUTextureAspect[] =
-    kDepthStencilFormatCapabilityInBufferTextureCopy[format][type];
-  return supportedAspects.includes(aspect);
-}
+/** Per-GPUStencilOperation info. */
+export const kStencilOperationInfo: {
+  readonly [k in GPUStencilOperation]: {};
+} = /* prettier-ignore */ {
+  'keep': {},
+  'zero': {},
+  'replace': {},
+  'invert': {},
+  'increment-clamp': {},
+  'decrement-clamp': {},
+  'increment-wrap': {},
+  'decrement-wrap': {},
+};
+/** List of all GPUStencilOperation values. */
+export const kStencilOperations = keysOf(kStencilOperationInfo);
 
-export function depthStencilFormatAspectSize(
-  format: DepthStencilFormat,
-  aspect: 'depth-only' | 'stencil-only'
-) {
-  const texelAspectSize =
-    kDepthStencilFormatCapabilityInBufferTextureCopy[format].texelAspectSize[aspect];
-  assert(texelAspectSize > 0);
-  return texelAspectSize;
-}
+// More textures (except for texture format info)
 
-export function textureDimensionAndFormatCompatible(
-  dimension: undefined | GPUTextureDimension,
-  format: GPUTextureFormat
-): boolean {
-  const info = kAllTextureFormatInfo[format];
-  return !(
-    (dimension === '1d' || dimension === '3d') &&
-    (info.blockWidth > 1 || info.depth || info.stencil)
-  );
-}
+/** Per-GPUTextureUsage type info. */
+export const kTextureUsageTypeInfo: {
+  readonly [name: string]: number;
+} = /* prettier-ignore */ {
+  'texture': Number(GPUConst.TextureUsage.TEXTURE_BINDING),
+  'storage': Number(GPUConst.TextureUsage.STORAGE_BINDING),
+  'render':  Number(GPUConst.TextureUsage.RENDER_ATTACHMENT),
+};
+/** List of all GPUTextureUsage type values. */
+export const kTextureUsageType = keysOf(kTextureUsageTypeInfo);
 
+/** Per-GPUTextureUsage copy info. */
+export const kTextureUsageCopyInfo: {
+  readonly [name: string]: number;
+} = /* prettier-ignore */ {
+  'none':     0,
+  'src':      Number(GPUConst.TextureUsage.COPY_SRC),
+  'dst':      Number(GPUConst.TextureUsage.COPY_DST),
+  'src-dest': Number(GPUConst.TextureUsage.COPY_SRC) | Number(GPUConst.TextureUsage.COPY_DST),
+};
+/** List of all GPUTextureUsage copy values. */
+export const kTextureUsageCopy = keysOf(kTextureUsageCopyInfo);
+
+/** Per-GPUTextureUsage info. */
 export const kTextureUsageInfo: {
   readonly [k in valueof<typeof GPUConst.TextureUsage>]: {};
 } = {
   [GPUConst.TextureUsage.COPY_SRC]: {},
   [GPUConst.TextureUsage.COPY_DST]: {},
-  [GPUConst.TextureUsage.SAMPLED]: {},
-  [GPUConst.TextureUsage.STORAGE]: {},
+  [GPUConst.TextureUsage.TEXTURE_BINDING]: {},
+  [GPUConst.TextureUsage.STORAGE_BINDING]: {},
   [GPUConst.TextureUsage.RENDER_ATTACHMENT]: {},
 };
+/** List of all GPUTextureUsage values. */
 export const kTextureUsages = numericKeysOf<GPUTextureUsageFlags>(kTextureUsageInfo);
 
 // Texture View
 
+/** Per-GPUTextureViewDimension info. */
+export type TextureViewDimensionInfo = {
+  /** Whether a storage texture view can have this view dimension. */
+  readonly storage: boolean;
+  // Add fields as needed
+};
+/** Per-GPUTextureViewDimension info. */
 export const kTextureViewDimensionInfo: {
-  readonly [k in GPUTextureViewDimension]: {
-    readonly storage: boolean;
-    // Add fields as needed
-  };
+  readonly [k in GPUTextureViewDimension]: TextureViewDimensionInfo;
 } = /* prettier-ignore */ {
   '1d':         { storage: true  },
   '2d':         { storage: true  },
@@ -340,61 +220,98 @@ export const kTextureViewDimensionInfo: {
   'cube-array': { storage: false },
   '3d':         { storage: true  },
 };
+/** List of all GPUTextureDimension values. */
 export const kTextureViewDimensions = keysOf(kTextureViewDimensionInfo);
 
 // Vertex formats
 
-export const kVertexFormatInfo = /* prettier-ignore */ makeTable(
-               ['bytesPerComponent',  'type', 'componentCount'] as const,
-               [                   ,        ,                 ] as const, {
+/** Per-GPUVertexFormat info. */
+// Exists just for documentation. Otherwise could be inferred by `makeTable`.
+export type VertexFormatInfo = {
+  /** Number of bytes in each component. */
+  readonly bytesPerComponent: 1 | 2 | 4;
+  /** The data encoding (float, normalized, or integer) for each component. */
+  readonly type: 'float' | 'unorm' | 'snorm' | 'uint' | 'sint';
+  /** Number of components. */
+  readonly componentCount: 1 | 2 | 3 | 4;
+  /** The completely matching WGSL type for vertex format */
+  readonly wgslType:
+    | 'f32'
+    | 'vec2<f32>'
+    | 'vec3<f32>'
+    | 'vec4<f32>'
+    | 'u32'
+    | 'vec2<u32>'
+    | 'vec3<u32>'
+    | 'vec4<u32>'
+    | 'i32'
+    | 'vec2<i32>'
+    | 'vec3<i32>'
+    | 'vec4<i32>';
+  // Add fields as needed
+};
+/** Per-GPUVertexFormat info. */
+export const kVertexFormatInfo: {
+  readonly [k in GPUVertexFormat]: VertexFormatInfo;
+} = /* prettier-ignore */ makeTable(
+               ['bytesPerComponent',  'type', 'componentCount',  'wgslType'] as const,
+               [                   ,        ,                 ,            ] as const, {
   // 8 bit components
-  'uint8x2':   [                  1,  'uint',                2],
-  'uint8x4':   [                  1,  'uint',                4],
-  'sint8x2':   [                  1,  'sint',                2],
-  'sint8x4':   [                  1,  'sint',                4],
-  'unorm8x2':  [                  1, 'unorm',                2],
-  'unorm8x4':  [                  1, 'unorm',                4],
-  'snorm8x2':  [                  1, 'snorm',                2],
-  'snorm8x4':  [                  1, 'snorm',                4],
+  'uint8x2':   [                  1,  'uint',                2, 'vec2<u32>'],
+  'uint8x4':   [                  1,  'uint',                4, 'vec4<u32>'],
+  'sint8x2':   [                  1,  'sint',                2, 'vec2<i32>'],
+  'sint8x4':   [                  1,  'sint',                4, 'vec4<i32>'],
+  'unorm8x2':  [                  1, 'unorm',                2, 'vec2<f32>'],
+  'unorm8x4':  [                  1, 'unorm',                4, 'vec4<f32>'],
+  'snorm8x2':  [                  1, 'snorm',                2, 'vec2<f32>'],
+  'snorm8x4':  [                  1, 'snorm',                4, 'vec4<f32>'],
   // 16 bit components
-  'uint16x2':  [                  2,  'uint',                2],
-  'uint16x4':  [                  2,  'uint',                4],
-  'sint16x2':  [                  2,  'sint',                2],
-  'sint16x4':  [                  2,  'sint',                4],
-  'unorm16x2': [                  2, 'unorm',                2],
-  'unorm16x4': [                  2, 'unorm',                4],
-  'snorm16x2': [                  2, 'snorm',                2],
-  'snorm16x4': [                  2, 'snorm',                4],
-  'float16x2': [                  2, 'float',                2],
-  'float16x4': [                  2, 'float',                4],
+  'uint16x2':  [                  2,  'uint',                2, 'vec2<u32>'],
+  'uint16x4':  [                  2,  'uint',                4, 'vec4<u32>'],
+  'sint16x2':  [                  2,  'sint',                2, 'vec2<i32>'],
+  'sint16x4':  [                  2,  'sint',                4, 'vec4<i32>'],
+  'unorm16x2': [                  2, 'unorm',                2, 'vec2<f32>'],
+  'unorm16x4': [                  2, 'unorm',                4, 'vec4<f32>'],
+  'snorm16x2': [                  2, 'snorm',                2, 'vec2<f32>'],
+  'snorm16x4': [                  2, 'snorm',                4, 'vec4<f32>'],
+  'float16x2': [                  2, 'float',                2, 'vec2<f32>'],
+  'float16x4': [                  2, 'float',                4, 'vec4<f32>'],
   // 32 bit components
-  'float32':   [                  4, 'float',                1],
-  'float32x2': [                  4, 'float',                2],
-  'float32x3': [                  4, 'float',                3],
-  'float32x4': [                  4, 'float',                4],
-  'uint32':    [                  4,  'uint',                1],
-  'uint32x2':  [                  4,  'uint',                2],
-  'uint32x3':  [                  4,  'uint',                3],
-  'uint32x4':  [                  4,  'uint',                4],
-  'sint32':    [                  4,  'sint',                1],
-  'sint32x2':  [                  4,  'sint',                2],
-  'sint32x3':  [                  4,  'sint',                3],
-  'sint32x4':  [                  4,  'sint',                4]
+  'float32':   [                  4, 'float',                1,       'f32'],
+  'float32x2': [                  4, 'float',                2, 'vec2<f32>'],
+  'float32x3': [                  4, 'float',                3, 'vec3<f32>'],
+  'float32x4': [                  4, 'float',                4, 'vec4<f32>'],
+  'uint32':    [                  4,  'uint',                1,       'u32'],
+  'uint32x2':  [                  4,  'uint',                2, 'vec2<u32>'],
+  'uint32x3':  [                  4,  'uint',                3, 'vec3<u32>'],
+  'uint32x4':  [                  4,  'uint',                4, 'vec4<u32>'],
+  'sint32':    [                  4,  'sint',                1,       'i32'],
+  'sint32x2':  [                  4,  'sint',                2, 'vec2<i32>'],
+  'sint32x3':  [                  4,  'sint',                3, 'vec3<i32>'],
+  'sint32x4':  [                  4,  'sint',                4, 'vec4<i32>']
 } as const);
-export type VertexFormat = keyof typeof kVertexFormatInfo;
+/** List of all GPUVertexFormat values. */
 export const kVertexFormats = keysOf(kVertexFormatInfo);
 
 // Typedefs for bindings
 
+/**
+ * Classes of `PerShaderStage` binding limits. Two bindings with the same class
+ * count toward the same `PerShaderStage` limit(s) in the spec (if any).
+ */
 export type PerStageBindingLimitClass =
   | 'uniformBuf'
   | 'storageBuf'
   | 'sampler'
   | 'sampledTex'
   | 'storageTex';
+/**
+ * Classes of `PerPipelineLayout` binding limits. Two bindings with the same class
+ * count toward the same `PerPipelineLayout` limit(s) in the spec (if any).
+ */
 export type PerPipelineBindingLimitClass = PerStageBindingLimitClass;
 
-type ValidBindableResource =
+export type ValidBindableResource =
   | 'uniformBuf'
   | 'storageBuf'
   | 'filtSamp'
@@ -405,6 +322,10 @@ type ValidBindableResource =
   | 'storageTex';
 type ErrorBindableResource = 'errorBuf' | 'errorSamp' | 'errorTex';
 
+/**
+ * Types of resource binding which have distinct binding rules, by spec
+ * (e.g. filtering vs non-filtering sampler, multisample vs non-multisample texture).
+ */
 export type BindableResource = ValidBindableResource | ErrorBindableResource;
 export const kBindableResources = [
   'uniformBuf',
@@ -423,28 +344,34 @@ assertTypeTrue<TypeEqual<BindableResource, typeof kBindableResources[number]>>()
 
 // Bindings
 
-// Dynamic buffer offsets require offset to be divisible by 256
+/** Dynamic buffer offsets require offset to be divisible by 256, by spec. */
 export const kMinDynamicBufferOffsetAlignment = 256;
 
-export const kMaxBindingsPerBindGroup = 16;
-
+/** Default `PerShaderStage` binding limits, by spec. */
 export const kPerStageBindingLimits: {
   readonly [k in PerStageBindingLimitClass]: {
+    /** Which `PerShaderStage` binding limit class. */
     readonly class: k;
+    /** Maximum number of allowed bindings in that class. */
     readonly max: number;
     // Add fields as needed
   };
 } = /* prettier-ignore */ {
   'uniformBuf': { class: 'uniformBuf', max: 12, },
-  'storageBuf': { class: 'storageBuf', max:  4, },
+  'storageBuf': { class: 'storageBuf', max:  8, },
   'sampler':    { class: 'sampler',    max: 16, },
   'sampledTex': { class: 'sampledTex', max: 16, },
   'storageTex': { class: 'storageTex', max:  4, },
 };
 
+/**
+ * Default `PerPipelineLayout` binding limits, by spec.
+ */
 export const kPerPipelineBindingLimits: {
   readonly [k in PerPipelineBindingLimitClass]: {
+    /** Which `PerPipelineLayout` binding limit class. */
     readonly class: k;
+    /** Maximum number of allowed bindings with `hasDynamicOffset: true` in that class. */
     readonly maxDynamic: number;
     // Add fields as needed
   };
@@ -486,6 +413,7 @@ const kValidStagesStorageWrite = {
   validStages: GPUConst.ShaderStage.FRAGMENT | GPUConst.ShaderStage.COMPUTE,
 } as const;
 
+/** Binding type info (including class limits) for the specified GPUBufferBindingLayout. */
 export function bufferBindingTypeInfo(d: GPUBufferBindingLayout) {
   /* prettier-ignore */
   switch (d.type ?? 'uniform') {
@@ -494,9 +422,11 @@ export function bufferBindingTypeInfo(d: GPUBufferBindingLayout) {
     case 'read-only-storage': return { usage: GPUConst.BufferUsage.STORAGE, ...kBindingKind.storageBuf,  ...kValidStagesAll,          };
   }
 }
+/** List of all GPUBufferBindingType values. */
 export const kBufferBindingTypes = ['uniform', 'storage', 'read-only-storage'] as const;
 assertTypeTrue<TypeEqual<GPUBufferBindingType, typeof kBufferBindingTypes[number]>>();
 
+/** Binding type info (including class limits) for the specified GPUSamplerBindingLayout. */
 export function samplerBindingTypeInfo(d: GPUSamplerBindingLayout) {
   /* prettier-ignore */
   switch (d.type ?? 'filtering') {
@@ -505,17 +435,20 @@ export function samplerBindingTypeInfo(d: GPUSamplerBindingLayout) {
     case 'comparison':    return { ...kBindingKind.compareSamp, ...kValidStagesAll, };
   }
 }
+/** List of all GPUSamplerBindingType values. */
 export const kSamplerBindingTypes = ['filtering', 'non-filtering', 'comparison'] as const;
 assertTypeTrue<TypeEqual<GPUSamplerBindingType, typeof kSamplerBindingTypes[number]>>();
 
+/** Binding type info (including class limits) for the specified GPUTextureBindingLayout. */
 export function sampledTextureBindingTypeInfo(d: GPUTextureBindingLayout) {
   /* prettier-ignore */
   if (d.multisampled) {
-    return { usage: GPUConst.TextureUsage.SAMPLED, ...kBindingKind.sampledTexMS, ...kValidStagesAll, };
+    return { usage: GPUConst.TextureUsage.TEXTURE_BINDING, ...kBindingKind.sampledTexMS, ...kValidStagesAll, };
   } else {
-    return { usage: GPUConst.TextureUsage.SAMPLED, ...kBindingKind.sampledTex,   ...kValidStagesAll, };
+    return { usage: GPUConst.TextureUsage.TEXTURE_BINDING, ...kBindingKind.sampledTex,   ...kValidStagesAll, };
   }
 }
+/** List of all GPUTextureSampleType values. */
 export const kTextureSampleTypes = [
   'float',
   'unfilterable-float',
@@ -525,22 +458,27 @@ export const kTextureSampleTypes = [
 ] as const;
 assertTypeTrue<TypeEqual<GPUTextureSampleType, typeof kTextureSampleTypes[number]>>();
 
+/** Binding type info (including class limits) for the specified GPUStorageTextureBindingLayout. */
 export function storageTextureBindingTypeInfo(d: GPUStorageTextureBindingLayout) {
-  /* prettier-ignore */
-  switch (d.access) {
-    case 'read-only':  return { usage: GPUConst.TextureUsage.STORAGE, ...kBindingKind.storageTex, ...kValidStagesAll,          };
-    case 'write-only': return { usage: GPUConst.TextureUsage.STORAGE, ...kBindingKind.storageTex, ...kValidStagesStorageWrite, };
-  }
+  return {
+    usage: GPUConst.TextureUsage.STORAGE_BINDING,
+    ...kBindingKind.storageTex,
+    ...kValidStagesStorageWrite,
+  };
 }
-export const kStorageTextureAccessValues = ['read-only', 'write-only'] as const;
+/** List of all GPUStorageTextureAccess values. */
+export const kStorageTextureAccessValues = ['write-only'] as const;
 assertTypeTrue<TypeEqual<GPUStorageTextureAccess, typeof kStorageTextureAccessValues[number]>>();
 
+/** GPUBindGroupLayoutEntry, but only the "union" fields, not the common fields. */
 export type BGLEntry = Omit<GPUBindGroupLayoutEntry, 'binding' | 'visibility'>;
+/** Binding type info (including class limits) for the specified BGLEntry. */
 export function texBindingTypeInfo(e: BGLEntry) {
   if (e.texture !== undefined) return sampledTextureBindingTypeInfo(e.texture);
   if (e.storageTexture !== undefined) return storageTextureBindingTypeInfo(e.storageTexture);
   unreachable();
 }
+/** BindingTypeInfo (including class limits) for the specified BGLEntry. */
 export function bindingTypeInfo(e: BGLEntry) {
   if (e.buffer !== undefined) return bufferBindingTypeInfo(e.buffer);
   if (e.texture !== undefined) return sampledTextureBindingTypeInfo(e.texture);
@@ -549,6 +487,11 @@ export function bindingTypeInfo(e: BGLEntry) {
   unreachable('GPUBindGroupLayoutEntry has no BindingLayout');
 }
 
+/**
+ * Generate a list of possible buffer-typed BGLEntry values.
+ *
+ * Note: Generates different `type` options, but not `hasDynamicOffset` options.
+ */
 export function bufferBindingEntries(includeUndefined: boolean): readonly BGLEntry[] {
   return [
     ...(includeUndefined ? [{ buffer: { type: undefined } }] : []),
@@ -557,6 +500,7 @@ export function bufferBindingEntries(includeUndefined: boolean): readonly BGLEnt
     { buffer: { type: 'read-only-storage' } },
   ] as const;
 }
+/** Generate a list of possible sampler-typed BGLEntry values. */
 export function samplerBindingEntries(includeUndefined: boolean): readonly BGLEntry[] {
   return [
     ...(includeUndefined ? [{ sampler: { type: undefined } }] : []),
@@ -565,19 +509,27 @@ export function samplerBindingEntries(includeUndefined: boolean): readonly BGLEn
     { sampler: { type: 'non-filtering' } },
   ] as const;
 }
+/**
+ * Generate a list of possible texture-typed BGLEntry values.
+ *
+ * Note: Generates different `multisampled` options, but not `sampleType` or `viewDimension` options.
+ */
 export function textureBindingEntries(includeUndefined: boolean): readonly BGLEntry[] {
   return [
     ...(includeUndefined ? [{ texture: { multisampled: undefined } }] : []),
     { texture: { multisampled: false } },
-    { texture: { multisampled: true } },
+    { texture: { multisampled: true, sampleType: 'unfilterable-float' } },
   ] as const;
 }
+/**
+ * Generate a list of possible storageTexture-typed BGLEntry values.
+ *
+ * Note: Generates different `access` options, but not `format` or `viewDimension` options.
+ */
 export function storageTextureBindingEntries(format: GPUTextureFormat): readonly BGLEntry[] {
-  return [
-    { storageTexture: { access: 'read-only', format } },
-    { storageTexture: { access: 'write-only', format } },
-  ] as const;
+  return [{ storageTexture: { access: 'write-only', format } }] as const;
 }
+/** Generate a list of possible texture-or-storageTexture-typed BGLEntry values. */
 export function sampledAndStorageBindingEntries(
   includeUndefined: boolean,
   storageTextureFormat: GPUTextureFormat = 'rgba8unorm'
@@ -587,8 +539,8 @@ export function sampledAndStorageBindingEntries(
     ...storageTextureBindingEntries(storageTextureFormat),
   ] as const;
 }
-/** Generates all different types of binding entries.
- * Does not generate variants with different:
+/**
+ * Generate a list of possible BGLEntry values of every type, but not variants with different:
  * - buffer.hasDynamicOffset
  * - texture.sampleType
  * - texture.viewDimension
@@ -607,22 +559,150 @@ export function allBindingEntries(
 
 // Shader stages
 
+/** List of all GPUShaderStage values. */
+export type ShaderStageKey = keyof typeof GPUConst.ShaderStage;
+export const kShaderStageKeys = Object.keys(GPUConst.ShaderStage) as ShaderStageKey[];
 export const kShaderStages: readonly GPUShaderStageFlags[] = [
   GPUConst.ShaderStage.VERTEX,
   GPUConst.ShaderStage.FRAGMENT,
   GPUConst.ShaderStage.COMPUTE,
 ];
+/** List of all possible combinations of GPUShaderStage values. */
 export const kShaderStageCombinations: readonly GPUShaderStageFlags[] = [0, 1, 2, 3, 4, 5, 6, 7];
+export const kShaderStageCombinationsWithStage: readonly GPUShaderStageFlags[] = [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+];
 
-// TODO: Update with all possible sample counts when defined
-// TODO: Switch existing tests to use kTextureSampleCounts
+/**
+ * List of all possible texture sampleCount values.
+ *
+ * MAINTENANCE_TODO: Switch existing tests to use kTextureSampleCounts
+ */
 export const kTextureSampleCounts = [1, 4] as const;
+
+// Blend factors and Blend components
+
+/** List of all GPUBlendFactor values. */
+export const kBlendFactors: readonly GPUBlendFactor[] = [
+  'zero',
+  'one',
+  'src',
+  'one-minus-src',
+  'src-alpha',
+  'one-minus-src-alpha',
+  'dst',
+  'one-minus-dst',
+  'dst-alpha',
+  'one-minus-dst-alpha',
+  'src-alpha-saturated',
+  'constant',
+  'one-minus-constant',
+];
+
+/** List of all GPUBlendOperation values. */
+export const kBlendOperations: readonly GPUBlendOperation[] = [
+  'add', //
+  'subtract',
+  'reverse-subtract',
+  'min',
+  'max',
+];
+
+// Primitive topologies
+export const kPrimitiveTopology: readonly GPUPrimitiveTopology[] = [
+  'point-list',
+  'line-list',
+  'line-strip',
+  'triangle-list',
+  'triangle-strip',
+];
+assertTypeTrue<TypeEqual<GPUPrimitiveTopology, typeof kPrimitiveTopology[number]>>();
+
+export const kIndexFormat: readonly GPUIndexFormat[] = ['uint16', 'uint32'];
+assertTypeTrue<TypeEqual<GPUIndexFormat, typeof kIndexFormat[number]>>();
+
+/** Info for each entry of GPUSupportedLimits */
+export const kLimitInfo = /* prettier-ignore */ makeTable(
+                                               [    'class', 'default',            'maximumValue'] as const,
+                                               [  'maximum',          ,     kMaxUnsignedLongValue] as const, {
+  'maxTextureDimension1D':                     [           ,      8192,                          ],
+  'maxTextureDimension2D':                     [           ,      8192,                          ],
+  'maxTextureDimension3D':                     [           ,      2048,                          ],
+  'maxTextureArrayLayers':                     [           ,       256,                          ],
+
+  'maxBindGroups':                             [           ,         4,                          ],
+  'maxBindingsPerBindGroup':                   [           ,      1000,                          ],
+  'maxDynamicUniformBuffersPerPipelineLayout': [           ,         8,                          ],
+  'maxDynamicStorageBuffersPerPipelineLayout': [           ,         4,                          ],
+  'maxSampledTexturesPerShaderStage':          [           ,        16,                          ],
+  'maxSamplersPerShaderStage':                 [           ,        16,                          ],
+  'maxStorageBuffersPerShaderStage':           [           ,         8,                          ],
+  'maxStorageTexturesPerShaderStage':          [           ,         4,                          ],
+  'maxUniformBuffersPerShaderStage':           [           ,        12,                          ],
+
+  'maxUniformBufferBindingSize':               [           ,     65536, kMaxUnsignedLongLongValue],
+  'maxStorageBufferBindingSize':               [           , 134217728, kMaxUnsignedLongLongValue],
+  'minUniformBufferOffsetAlignment':           ['alignment',       256,                          ],
+  'minStorageBufferOffsetAlignment':           ['alignment',       256,                          ],
+
+  'maxVertexBuffers':                          [           ,         8,                          ],
+  'maxBufferSize':                             [           , 268435456, kMaxUnsignedLongLongValue],
+  'maxVertexAttributes':                       [           ,        16,                          ],
+  'maxVertexBufferArrayStride':                [           ,      2048,                          ],
+  'maxInterStageShaderComponents':             [           ,        60,                          ],
+  'maxInterStageShaderVariables':              [           ,        16,                          ],
+
+  'maxColorAttachments':                       [           ,         8,                          ],
+  'maxColorAttachmentBytesPerSample':          [           ,        32,                          ],
+
+  'maxComputeWorkgroupStorageSize':            [           ,     16384,                          ],
+  'maxComputeInvocationsPerWorkgroup':         [           ,       256,                          ],
+  'maxComputeWorkgroupSizeX':                  [           ,       256,                          ],
+  'maxComputeWorkgroupSizeY':                  [           ,       256,                          ],
+  'maxComputeWorkgroupSizeZ':                  [           ,        64,                          ],
+  'maxComputeWorkgroupsPerDimension':          [           ,     65535,                          ],
+} as const);
+
+/** List of all entries of GPUSupportedLimits. */
+export const kLimits = keysOf(kLimitInfo);
 
 // Pipeline limits
 
-// TODO: Update maximum color attachments when defined
-export const kMaxColorAttachments = 4;
+/** Maximum number of color attachments to a render pass, by spec. */
+export const kMaxColorAttachments = kLimitInfo.maxColorAttachments.default;
+/** `maxVertexBuffers` per GPURenderPipeline, by spec. */
+export const kMaxVertexBuffers = kLimitInfo.maxVertexBuffers.default;
+/** `maxVertexAttributes` per GPURenderPipeline, by spec. */
+export const kMaxVertexAttributes = kLimitInfo.maxVertexAttributes.default;
+/** `maxVertexBufferArrayStride` in a vertex buffer in a GPURenderPipeline, by spec. */
+export const kMaxVertexBufferArrayStride = kLimitInfo.maxVertexBufferArrayStride.default;
 
-export const kMaxVertexBuffers = 8;
-export const kMaxVertexAttributes = 16;
-export const kMaxVertexBufferArrayStride = 2048;
+/** The size of indirect draw parameters in the indirectBuffer of drawIndirect */
+export const kDrawIndirectParametersSize = 4;
+/** The size of indirect drawIndexed parameters in the indirectBuffer of drawIndexedIndirect */
+export const kDrawIndexedIndirectParametersSize = 5;
+
+/** Per-GPUFeatureName info. */
+export const kFeatureNameInfo: {
+  readonly [k in GPUFeatureName]: {};
+} = /* prettier-ignore */ {
+  'bgra8unorm-storage': {},
+  'depth-clip-control': {},
+  'depth32float-stencil8': {},
+  'texture-compression-bc': {},
+  'texture-compression-etc2': {},
+  'texture-compression-astc': {},
+  'timestamp-query': {},
+  'indirect-first-instance': {},
+  'shader-f16': {},
+  'rg11b10ufloat-renderable': {},
+  'float32-filterable': {},
+};
+/** List of all GPUFeatureName values. */
+export const kFeatureNames = keysOf(kFeatureNameInfo);

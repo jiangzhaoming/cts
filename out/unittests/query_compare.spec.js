@@ -2,15 +2,15 @@
 * AUTO-GENERATED - DO NOT EDIT. Source: https://github.com/gpuweb/cts
 **/export const description = `
 Tests for TestQuery comparison
-`;import { compareQueries, Ordering } from '../common/framework/query/compare.js';
+`;import { makeTestGroup } from '../common/framework/test_group.js';
+import { compareQueries, Ordering } from '../common/internal/query/compare.js';
 import {
 
 TestQuerySingleCase,
 TestQueryMultiFile,
 TestQueryMultiTest,
 TestQueryMultiCase } from
-'../common/framework/query/query.js';
-import { makeTestGroup } from '../common/framework/test_group.js';
+'../common/internal/query/query.js';
 
 import { UnitTest } from './unit_test.js';
 
@@ -50,8 +50,8 @@ class F extends UnitTest {
         this.expectQ(qs[i], '!', qs[j]);
       }
     }
-  }}
-
+  }
+}
 
 export const g = makeTestGroup(F);
 
@@ -59,7 +59,7 @@ export const g = makeTestGroup(F);
 // suite:a,b:*  >  suite:a,b:c,*  >  suite:a,b:c,d,*  >  suite:a,b:c,d:*
 // suite:a,b:c,d:*  >  suite:a,b:c,d:x=1;*  >  suite:a,b:c,d:x=1;y=2;*  >  suite:a,b:c,d:x=1;y=2
 // suite:a;* (unordered) suite:b;*
-g.test('well_ordered').fn(t => {
+g.test('well_ordered').fn((t) => {
   t.expectWellOrdered(
   new TestQueryMultiFile('suite', []),
   new TestQueryMultiFile('suite', ['a']),
@@ -84,7 +84,7 @@ g.test('well_ordered').fn(t => {
 
 });
 
-g.test('unordered').fn(t => {
+g.test('unordered').fn((t) => {
   t.expectUnordered(
   new TestQueryMultiFile('suite', ['a']), //
   new TestQueryMultiFile('suite', ['x']));

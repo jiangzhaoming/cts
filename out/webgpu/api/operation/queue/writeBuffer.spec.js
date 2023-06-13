@@ -1,8 +1,7 @@
 /**
 * AUTO-GENERATED - DO NOT EDIT. Source: https://github.com/gpuweb/cts
-**/export const description = 'Operation tests for GPUQueue.writeBuffer()';import { params, pbool, poptions } from '../../../../common/framework/params_builder.js';
-import { makeTestGroup } from '../../../../common/framework/test_group.js';
-import { range } from '../../../../common/framework/util/util.js';
+**/export const description = 'Operation tests for GPUQueue.writeBuffer()';import { makeTestGroup } from '../../../../common/framework/test_group.js';
+import { memcpy, range } from '../../../../common/util/util.js';
 import { GPUTest } from '../../../gpu_test.js';
 import { align } from '../../../util/math.js';
 
@@ -60,51 +59,43 @@ class F extends GPUTest {
 
   testWriteBuffer(...writes) {
     const bufferSize = this.calculateRequiredBufferSize(writes);
-    const buffer = this.device.createBuffer({
-      size: bufferSize,
-      usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true });
-
 
     // Initialize buffer to non-zero data (0xff) for easier debug.
     const expectedData = new Uint8Array(bufferSize).fill(0xff);
-    const bufferData = buffer.getMappedRange();
-    new Uint8Array(bufferData).set(expectedData);
-    buffer.unmap();
+
+    const buffer = this.makeBufferWithContents(
+    expectedData,
+    GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
+
 
     for (const { bufferOffset, data, arrayType, useArrayBuffer, dataOffset, dataSize } of writes) {
       const TypedArrayConstructor = globalThis[arrayType];
       const writeData = new TypedArrayConstructor(data);
-      this.queue.writeBuffer(
-      buffer,
-      bufferOffset,
-      useArrayBuffer ? writeData.buffer : writeData,
-      dataOffset,
-      dataSize);
-
-      const bytesPerElement = useArrayBuffer ? 1 : TypedArrayConstructor.BYTES_PER_ELEMENT;
-      const begin = dataOffset ? dataOffset * bytesPerElement : 0;
-      expectedData.set(
-      new Uint8Array(
-      writeData.buffer.slice(begin, dataSize ? begin + dataSize * bytesPerElement : undefined)),
-
-      bufferOffset);
+      const writeSrc = useArrayBuffer ? writeData.buffer : writeData;
+      this.queue.writeBuffer(buffer, bufferOffset, writeSrc, dataOffset, dataSize);
+      memcpy(
+      { src: writeSrc, start: dataOffset, length: dataSize },
+      { dst: expectedData, start: bufferOffset });
 
     }
 
     this.debug(`expectedData: [${expectedData.join(', ')}]`);
-    this.expectContents(buffer, expectedData);
-  }}
-
+    this.expectGPUBufferValuesEqual(buffer, expectedData);
+  }
+}
 
 export const g = makeTestGroup(F);
 
-const kTestData = range(16, i => i);
+const kTestData = range(16, (i) => i);
 
 g.test('array_types').
 desc('Tests that writeBuffer correctly handles different TypedArrays and ArrayBuffer.').
-cases(params().combine(poptions('arrayType', kTypedArrays)).combine(pbool('useArrayBuffer'))).
-fn(t => {
+params((u) =>
+u //
+.combine('arrayType', kTypedArrays).
+combine('useArrayBuffer', [false, true])).
+
+fn((t) => {
   const { arrayType, useArrayBuffer } = t.params;
   const dataOffset = 1;
   const dataSize = 8;
@@ -114,8 +105,8 @@ fn(t => {
     data: kTestData,
     dataOffset,
     dataSize,
-    useArrayBuffer });
-
+    useArrayBuffer
+  });
 });
 
 g.test('multiple_writes_at_different_offsets_and_sizes').
@@ -130,7 +121,7 @@ Tests that writeBuffer currently handles different offsets and writes. This incl
 - Multiple overlapping writes with decreasing sizes
     `).
 
-cases([
+paramsSubcasesOnly([
 {
   // Concatenate 2 Uint32Arrays
   writes: [
@@ -140,16 +131,16 @@ cases([
     arrayType: 'Uint32Array',
     useArrayBuffer: false,
     dataOffset: 2,
-    dataSize: 2 },
-  // [2, 3]
+    dataSize: 2
+  }, // [2, 3]
   {
     bufferOffset: 2 * Uint32Array.BYTES_PER_ELEMENT,
     data: kTestData,
     arrayType: 'Uint32Array',
     useArrayBuffer: false,
     dataOffset: 0,
-    dataSize: 2 }
-  // [0, 1]
+    dataSize: 2
+  } // [0, 1]
   ] // Expected [2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
 },
 {
@@ -175,8 +166,8 @@ cases([
     arrayType: 'Uint32Array',
     useArrayBuffer: true,
     dataOffset: 2,
-    dataSize: 4 * Uint32Array.BYTES_PER_ELEMENT },
-
+    dataSize: 4 * Uint32Array.BYTES_PER_ELEMENT
+  },
   { bufferOffset: 4, data: [0x04030201], arrayType: 'Uint32Array', useArrayBuffer: true }]
   // Expected [0, 0, 1, 0, 1, 2, 3, 4, 0, 0, 3, 0, 0, 0, 4, 0]
 },
@@ -189,8 +180,8 @@ cases([
 },
 {
   // Zero buffer
-  writes: [{ bufferOffset: 0, data: [], arrayType: 'Uint8Array', useArrayBuffer: false }] },
-// Expected []
+  writes: [{ bufferOffset: 0, data: [], arrayType: 'Uint8Array', useArrayBuffer: false }]
+}, // Expected []
 {
   // Unaligned source
   writes: [
@@ -199,8 +190,8 @@ cases([
     data: [0x77, ...kTestData],
     arrayType: 'Uint8Array',
     useArrayBuffer: false,
-    dataOffset: 1 }]
-
+    dataOffset: 1
+  }]
   // Expected [0, 1, 2, 3, 4, 5 ,6 ,7, 8, 9, 10, 11, 12, 13, 14, 15]
 },
 {
@@ -210,36 +201,36 @@ cases([
     bufferOffset: 0,
     data: [0x05050505, 0x05050505, 0x05050505, 0x05050505, 0x05050505],
     arrayType: 'Uint32Array',
-    useArrayBuffer: false },
-
+    useArrayBuffer: false
+  },
   {
     bufferOffset: 0,
     data: [0x04040404, 0x04040404, 0x04040404, 0x04040404],
     arrayType: 'Uint32Array',
-    useArrayBuffer: false },
-
+    useArrayBuffer: false
+  },
   {
     bufferOffset: 0,
     data: [0x03030303, 0x03030303, 0x03030303],
     arrayType: 'Uint32Array',
-    useArrayBuffer: false },
-
+    useArrayBuffer: false
+  },
   {
     bufferOffset: 0,
     data: [0x02020202, 0x02020202],
     arrayType: 'Uint32Array',
-    useArrayBuffer: false },
-
+    useArrayBuffer: false
+  },
   {
     bufferOffset: 0,
     data: [0x01010101],
     arrayType: 'Uint32Array',
-    useArrayBuffer: false }]
-
+    useArrayBuffer: false
+  }]
   // Expected [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]
 }]).
 
-fn(t => {
+fn((t) => {
   t.testWriteBuffer(...t.params.writes);
 });
 //# sourceMappingURL=writeBuffer.spec.js.map

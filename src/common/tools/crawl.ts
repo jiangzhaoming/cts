@@ -5,10 +5,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { SpecFile } from '../framework/file_loader.js';
-import { validQueryPart } from '../framework/query/validQueryPart.js';
-import { TestSuiteListingEntry, TestSuiteListing } from '../framework/test_suite_listing.js';
-import { assert, unreachable } from '../framework/util/util.js';
+import { SpecFile } from '../internal/file_loader.js';
+import { validQueryPart } from '../internal/query/validQueryPart.js';
+import { TestSuiteListingEntry, TestSuiteListing } from '../internal/test_suite_listing.js';
+import { assert, unreachable } from '../util/util.js';
 
 const specFileSuffix = __filename.endsWith('.ts') ? '.spec.ts' : '.spec.js';
 
@@ -43,10 +43,7 @@ async function crawlFilesRecursively(dir: string): Promise<string[]> {
   );
 }
 
-export async function crawl(
-  suiteDir: string,
-  validate: boolean = true
-): Promise<TestSuiteListingEntry[]> {
+export async function crawl(suiteDir: string, validate: boolean): Promise<TestSuiteListingEntry[]> {
   if (!fs.existsSync(suiteDir)) {
     console.error(`Could not find ${suiteDir}`);
     process.exit(1);

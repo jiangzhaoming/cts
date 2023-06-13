@@ -1,11 +1,12 @@
-// Implements the wpt-embedded test runner (see also: wpt/cts.html).
+// Implements the wpt-embedded test runner (see also: wpt/cts.https.html).
 
-import { DefaultTestFileLoader } from '../framework/file_loader.js';
-import { prettyPrintLog } from '../framework/logging/log_message.js';
-import { Logger } from '../framework/logging/logger.js';
-import { parseQuery } from '../framework/query/parseQuery.js';
-import { parseExpectationsForTestQuery, relativeQueryString } from '../framework/query/query.js';
-import { assert } from '../framework/util/util.js';
+import { globalTestConfig } from '../framework/test_config.js';
+import { DefaultTestFileLoader } from '../internal/file_loader.js';
+import { prettyPrintLog } from '../internal/logging/log_message.js';
+import { Logger } from '../internal/logging/logger.js';
+import { parseQuery } from '../internal/query/parseQuery.js';
+import { parseExpectationsForTestQuery, relativeQueryString } from '../internal/query/query.js';
+import { assert } from '../util/util.js';
 
 import { optionEnabled } from './helper/options.js';
 import { TestWorker } from './helper/test_worker.js';
@@ -21,6 +22,7 @@ declare function done(): void;
 declare function assert_unreached(description: string): void;
 
 declare const loadWebGPUExpectations: Promise<unknown> | undefined;
+declare const shouldWebGPUCTSFailOnWarnings: Promise<boolean> | undefined;
 
 setup({
   // It's convenient for us to asynchronously add tests to the page. Prevent done() from being
@@ -28,9 +30,14 @@ setup({
   explicit_done: true,
 });
 
-(async () => {
+void (async () => {
   const workerEnabled = optionEnabled('worker');
   const worker = workerEnabled ? new TestWorker(false) : undefined;
+
+  globalTestConfig.unrollConstEvalLoops = optionEnabled('unroll_const_eval_loops');
+
+  const failOnWarnings =
+    typeof shouldWebGPUCTSFailOnWarnings !== 'undefined' && (await shouldWebGPUCTSFailOnWarnings);
 
   const loader = new DefaultTestFileLoader();
   const qs = new URLSearchParams(window.location.search).getAll('q');
@@ -47,7 +54,7 @@ setup({
         )
       : [];
 
-  const log = new Logger(false);
+  const log = new Logger();
 
   for (const testcase of testcases) {
     const name = testcase.query.toString();
@@ -63,7 +70,7 @@ setup({
       }
 
       // Unfortunately, it seems not possible to surface any logs for warn/skip.
-      if (res.status === 'fail') {
+      if (res.status === 'fail' || (res.status === 'warn' && failOnWarnings)) {
         const logs = (res.logs ?? []).map(prettyPrintLog);
         assert_unreached('\n' + logs.join('\n') + '\n');
       }

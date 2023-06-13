@@ -2,7 +2,8 @@
 * AUTO-GENERATED - DO NOT EDIT. Source: https://github.com/gpuweb/cts
 **/export const description = `
 Unit tests for TestQuery strings.
-`;import { compareQueries, Ordering } from '../common/framework/query/compare.js';
+`;import { makeTestGroup } from '../common/framework/test_group.js';
+import { compareQueries, Ordering } from '../common/internal/query/compare.js';
 import {
 
 TestQuerySingleCase,
@@ -10,8 +11,7 @@ TestQueryMultiCase,
 TestQueryMultiTest,
 TestQueryMultiFile,
 relativeQueryString } from
-'../common/framework/query/query.js';
-import { makeTestGroup } from '../common/framework/test_group.js';
+'../common/internal/query/query.js';
 
 import { UnitTest } from './unit_test.js';
 
@@ -31,41 +31,41 @@ class T extends UnitTest {
         relativeQueryString(child, parent);
       });
     }
-  }}
-
+  }
+}
 
 export const g = makeTestGroup(T);
 
-g.test('stringifyQuery,single_case').fn(t => {
+g.test('stringifyQuery,single_case').fn((t) => {
   t.expectQueryString(
   new TestQuerySingleCase('a', ['b_1', '2_c'], ['d_3', '4_e'], {
     f: 'g',
     _pri1: 0,
     x: 3,
-    _pri2: 1 }),
-
+    _pri2: 1
+  }),
   'a:b_1,2_c:d_3,4_e:f="g";x=3');
 
 });
 
-g.test('stringifyQuery,single_case,json').fn(t => {
+g.test('stringifyQuery,single_case,json').fn((t) => {
   t.expectQueryString(
   new TestQuerySingleCase('a', ['b_1', '2_c'], ['d_3', '4_e'], {
     f: 'g',
-    x: { p: 2, q: 'Q' } }),
-
+    x: { p: 2, q: 'Q' }
+  }),
   'a:b_1,2_c:d_3,4_e:f="g";x={"p":2,"q":"Q"}');
 
 });
 
-g.test('stringifyQuery,multi_case').fn(t => {
+g.test('stringifyQuery,multi_case').fn((t) => {
   t.expectQueryString(
   new TestQueryMultiCase('a', ['b_1', '2_c'], ['d_3', '4_e'], {
     f: 'g',
     _pri1: 0,
     a: 3,
-    _pri2: 1 }),
-
+    _pri2: 1
+  }),
   'a:b_1,2_c:d_3,4_e:f="g";a=3;*');
 
 
@@ -75,7 +75,7 @@ g.test('stringifyQuery,multi_case').fn(t => {
 
 });
 
-g.test('stringifyQuery,multi_test').fn(t => {
+g.test('stringifyQuery,multi_test').fn((t) => {
   t.expectQueryString(
   new TestQueryMultiTest('a', ['b_1', '2_c'], ['d_3', '4_e']),
   'a:b_1,2_c:d_3,4_e,*');
@@ -87,7 +87,7 @@ g.test('stringifyQuery,multi_test').fn(t => {
 
 });
 
-g.test('stringifyQuery,multi_file').fn(t => {
+g.test('stringifyQuery,multi_file').fn((t) => {
   t.expectQueryString(
   new TestQueryMultiFile('a', ['b_1', '2_c']), //
   'a:b_1,2_c,*');
@@ -99,7 +99,7 @@ g.test('stringifyQuery,multi_file').fn(t => {
 
 });
 
-g.test('relativeQueryString,equal_or_child').fn(t => {
+g.test('relativeQueryString,equal_or_child').fn((t) => {
   // Depth difference = 0
   t.expectRelativeQueryString(
   new TestQueryMultiFile('a', []), //
@@ -246,7 +246,7 @@ g.test('relativeQueryString,equal_or_child').fn(t => {
 
 });
 
-g.test('relativeQueryString,unrelated').fn(t => {
+g.test('relativeQueryString,unrelated').fn((t) => {
   t.shouldThrow('Error', () => {
     relativeQueryString(
     new TestQueryMultiFile('a', ['b', 'x']), //

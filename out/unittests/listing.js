@@ -17,6 +17,21 @@ export const listing = [
   },
   {
     "file": [
+      "check_contents"
+    ]
+  },
+  {
+    "file": [
+      "conversion"
+    ]
+  },
+  {
+    "file": [
+      "floating_point"
+    ]
+  },
+  {
+    "file": [
       "getStackTrace"
     ]
   },
@@ -28,6 +43,11 @@ export const listing = [
   {
     "file": [
       "logger"
+    ]
+  },
+  {
+    "file": [
+      "maths"
     ]
   },
   {
@@ -53,6 +73,11 @@ export const listing = [
   {
     "file": [
       "query_string"
+    ]
+  },
+  {
+    "file": [
+      "serialization"
     ]
   },
   {

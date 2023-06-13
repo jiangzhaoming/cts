@@ -2,7 +2,6 @@ export const description = `
 Test indexing, index format and primitive restart.
 `;
 
-import { params, poptions } from '../../../../common/framework/params_builder.js';
 import { makeTestGroup } from '../../../../common/framework/test_group.js';
 import { GPUTest } from '../../../gpu_test.js';
 import { getTextureCopyLayout } from '../../../util/texture/layout.js';
@@ -55,33 +54,30 @@ class IndexFormatTest extends GPUTest {
     stripIndexFormat?: GPUIndexFormat
   ): GPURenderPipeline {
     const vertexModule = this.device.createShaderModule({
-      // TODO?: These positions will create triangles that cut right through pixel centers. If this
+      // NOTE: These positions will create triangles that cut right through pixel centers. If this
       // results in different rasterization results on different hardware, tweak to avoid this.
       code: `
-        let pos: array<vec2<f32>, 4> = array<vec2<f32>, 4>(
-          vec2<f32>(0.01,  0.98),
-          vec2<f32>(0.99, -0.98),
-          vec2<f32>(0.99,  0.98),
-          vec2<f32>(0.01, -0.98));
+        @vertex
+        fn main(@builtin(vertex_index) VertexIndex : u32)
+             -> @builtin(position) vec4<f32> {
+          var pos = array<vec2<f32>, 4>(
+            vec2<f32>(0.01,  0.98),
+            vec2<f32>(0.99, -0.98),
+            vec2<f32>(0.99,  0.98),
+            vec2<f32>(0.01, -0.98));
 
-        [[stage(vertex)]]
-        fn main([[builtin(vertex_index)]] VertexIndex : u32)
-             -> [[builtin(position)]] vec4<f32> {
-          var Position : vec4<f32>;
           if (VertexIndex == 0xFFFFu || VertexIndex == 0xFFFFFFFFu) {
-            Position = vec4<f32>(-0.99, -0.98, 0.0, 1.0);
-          } else {
-            Position = vec4<f32>(pos[VertexIndex], 0.0, 1.0);
+            return vec4<f32>(-0.99, -0.98, 0.0, 1.0);
           }
-          return Position;
+          return vec4<f32>(pos[VertexIndex], 0.0, 1.0);
         }
       `,
     });
 
     const fragmentModule = this.device.createShaderModule({
       code: `
-        [[stage(fragment)]]
-        fn main() -> [[location(0)]] u32 {
+        @fragment
+        fn main() -> @location(0) u32 {
           return 1u;
         }
       `,
@@ -104,17 +100,7 @@ class IndexFormatTest extends GPUTest {
 
   CreateIndexBuffer(indices: readonly number[], indexFormat: GPUIndexFormat): GPUBuffer {
     const typedArrayConstructor = { uint16: Uint16Array, uint32: Uint32Array }[indexFormat];
-
-    const indexBuffer = this.device.createBuffer({
-      size: indices.length * typedArrayConstructor.BYTES_PER_ELEMENT,
-      usage: GPUBufferUsage.INDEX,
-      mappedAtCreation: true,
-    });
-
-    new typedArrayConstructor(indexBuffer.getMappedRange()).set(indices);
-
-    indexBuffer.unmap();
-    return indexBuffer;
+    return this.makeBufferWithContents(new typedArrayConstructor(indices), GPUBufferUsage.INDEX);
   }
 
   run(
@@ -125,7 +111,7 @@ class IndexFormatTest extends GPUTest {
     primitiveTopology: GPUPrimitiveTopology = 'triangle-list'
   ): GPUBuffer {
     let pipeline: GPURenderPipeline;
-    // The indexFormat must be set in render pipeline descriptor that specifys a strip primitive
+    // The indexFormat must be set in render pipeline descriptor that specifies a strip primitive
     // topology for primitive restart testing
     if (primitiveTopology === 'line-strip' || primitiveTopology === 'triangle-strip') {
       pipeline = this.MakeRenderPipeline(primitiveTopology, indexFormat);
@@ -147,13 +133,18 @@ class IndexFormatTest extends GPUTest {
     const encoder = this.device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
       colorAttachments: [
-        { view: colorAttachment.createView(), loadValue: [0, 0, 0, 0], storeOp: 'store' },
+        {
+          view: colorAttachment.createView(),
+          clearValue: [0, 0, 0, 0],
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
       ],
     });
     pass.setPipeline(pipeline);
     pass.setIndexBuffer(indexBuffer, indexFormat, indexOffset);
     pass.drawIndexed(indexCount);
-    pass.endPass();
+    pass.end();
     encoder.copyTextureToBuffer(
       { texture: colorAttachment },
       { buffer: result, bytesPerRow, rowsPerImage },
@@ -183,13 +174,13 @@ export const g = makeTestGroup(IndexFormatTest);
 
 g.test('index_format,uint16')
   .desc('Test rendering result of indexed draw with index format of uint16.')
-  .params([
-    { indexOffset: 0, _expectedShape: kSquare },
-    { indexOffset: 6, _expectedShape: kBottomLeftTriangle },
-    { indexOffset: 18, _expectedShape: kNothing },
+  .paramsSubcasesOnly([
+    { indexOffset: 0, _indexCount: 10, _expectedShape: kSquare },
+    { indexOffset: 6, _indexCount: 6, _expectedShape: kBottomLeftTriangle },
+    { indexOffset: 18, _indexCount: 0, _expectedShape: kNothing },
   ])
   .fn(t => {
-    const { indexOffset, _expectedShape } = t.params;
+    const { indexOffset, _indexCount, _expectedShape } = t.params;
 
     // If this is written as uint16 but interpreted as uint32, it will have index 1 and 2 be both 0
     // and render nothing.
@@ -197,31 +188,241 @@ g.test('index_format,uint16')
     // list, otherwise it also render nothing.
     const indices: number[] = [1, 2, 0, 0, 0, 0, 0, 1, 3, 0];
     const indexBuffer = t.CreateIndexBuffer(indices, 'uint16');
-    const result = t.run(indexBuffer, indices.length, 'uint16', indexOffset);
+    const result = t.run(indexBuffer, _indexCount, 'uint16', indexOffset);
 
     const expectedTextureValues = t.CreateExpectedUint8Array(_expectedShape);
-    t.expectContents(result, expectedTextureValues);
+    t.expectGPUBufferValuesEqual(result, expectedTextureValues);
   });
 
 g.test('index_format,uint32')
   .desc('Test rendering result of indexed draw with index format of uint32.')
-  .params([
-    { indexOffset: 0, _expectedShape: kSquare },
-    { indexOffset: 12, _expectedShape: kBottomLeftTriangle },
-    { indexOffset: 36, _expectedShape: kNothing },
+  .paramsSubcasesOnly([
+    { indexOffset: 0, _indexCount: 10, _expectedShape: kSquare },
+    { indexOffset: 12, _indexCount: 7, _expectedShape: kBottomLeftTriangle },
+    { indexOffset: 36, _indexCount: 0, _expectedShape: kNothing },
   ])
   .fn(t => {
-    const { indexOffset, _expectedShape } = t.params;
+    const { indexOffset, _indexCount, _expectedShape } = t.params;
 
     // If this is interpreted as uint16, then it would be 0, 1, 0, ... and would draw nothing.
     // And the index buffer size - offset must be not less than the size required by triangle
     // list, otherwise it also render nothing.
     const indices: number[] = [1, 2, 0, 0, 0, 0, 0, 1, 3, 0];
     const indexBuffer = t.CreateIndexBuffer(indices, 'uint32');
-    const result = t.run(indexBuffer, indices.length, 'uint32', indexOffset);
+    const result = t.run(indexBuffer, _indexCount, 'uint32', indexOffset);
 
     const expectedTextureValues = t.CreateExpectedUint8Array(_expectedShape);
-    t.expectContents(result, expectedTextureValues);
+    t.expectGPUBufferValuesEqual(result, expectedTextureValues);
+  });
+
+g.test('index_format,change_pipeline_after_setIndexBuffer')
+  .desc('Test that setting the index buffer before the pipeline works correctly.')
+  .params(u => u.combine('setPipelineBeforeSetIndexBuffer', [false, true]))
+  .fn(t => {
+    const indexOffset = 12;
+    const indexCount = 7;
+    const expectedShape = kBottomLeftTriangle;
+
+    const indexFormat16 = 'uint16';
+    const indexFormat32 = 'uint32';
+
+    const indices: number[] = [1, 2, 0, 0, 0, 0, 0, 1, 3, 0];
+    const indexBuffer = t.CreateIndexBuffer(indices, indexFormat32);
+
+    const kPrimitiveTopology = 'triangle-strip';
+    const pipeline32 = t.MakeRenderPipeline(kPrimitiveTopology, indexFormat32);
+    const pipeline16 = t.MakeRenderPipeline(kPrimitiveTopology, indexFormat16);
+
+    const colorAttachment = t.device.createTexture({
+      format: kTextureFormat,
+      size: { width: kWidth, height: kHeight, depthOrArrayLayers: 1 },
+      usage: GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    const result = t.device.createBuffer({
+      size: byteLength,
+      usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    const encoder = t.device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: colorAttachment.createView(),
+          clearValue: [0, 0, 0, 0],
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+    });
+
+    if (t.params.setPipelineBeforeSetIndexBuffer) {
+      pass.setPipeline(pipeline16);
+    }
+    pass.setIndexBuffer(indexBuffer, indexFormat32, indexOffset);
+    pass.setPipeline(pipeline32); // Set the pipeline for 'indexFormat32' again.
+    pass.drawIndexed(indexCount);
+    pass.end();
+    encoder.copyTextureToBuffer(
+      { texture: colorAttachment },
+      { buffer: result, bytesPerRow, rowsPerImage },
+      [kWidth, kHeight]
+    );
+    t.device.queue.submit([encoder.finish()]);
+
+    const expectedTextureValues = t.CreateExpectedUint8Array(expectedShape);
+    t.expectGPUBufferValuesEqual(result, expectedTextureValues);
+  });
+
+g.test('index_format,setIndexBuffer_before_setPipeline')
+  .desc('Test that setting the index buffer before the pipeline works correctly.')
+  .params(u => u.combine('setIndexBufferBeforeSetPipeline', [false, true]))
+  .fn(t => {
+    const indexOffset = 12;
+    const indexCount = 7;
+    const expectedShape = kBottomLeftTriangle;
+
+    const indexFormat = 'uint32';
+
+    const indices: number[] = [1, 2, 0, 0, 0, 0, 0, 1, 3, 0];
+    const indexBuffer = t.CreateIndexBuffer(indices, indexFormat);
+
+    const kPrimitiveTopology = 'triangle-strip';
+    const pipeline = t.MakeRenderPipeline(kPrimitiveTopology, indexFormat);
+
+    const colorAttachment = t.device.createTexture({
+      format: kTextureFormat,
+      size: { width: kWidth, height: kHeight, depthOrArrayLayers: 1 },
+      usage: GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    const result = t.device.createBuffer({
+      size: byteLength,
+      usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    const encoder = t.device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: colorAttachment.createView(),
+          clearValue: [0, 0, 0, 0],
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+    });
+
+    if (t.params.setIndexBufferBeforeSetPipeline) {
+      pass.setIndexBuffer(indexBuffer, indexFormat, indexOffset);
+      pass.setPipeline(pipeline);
+    } else {
+      pass.setPipeline(pipeline);
+      pass.setIndexBuffer(indexBuffer, indexFormat, indexOffset);
+    }
+
+    pass.drawIndexed(indexCount);
+    pass.end();
+    encoder.copyTextureToBuffer(
+      { texture: colorAttachment },
+      { buffer: result, bytesPerRow, rowsPerImage },
+      [kWidth, kHeight]
+    );
+    t.device.queue.submit([encoder.finish()]);
+
+    const expectedTextureValues = t.CreateExpectedUint8Array(expectedShape);
+    t.expectGPUBufferValuesEqual(result, expectedTextureValues);
+  });
+
+g.test('index_format,setIndexBuffer_different_formats')
+  .desc(
+    `
+  Test that index buffers of multiple formats can be used with a pipeline that doesn't use strip
+  primitive topology.
+  `
+  )
+  .fn(t => {
+    const indices: number[] = [1, 2, 0, 0, 0, 0, 0, 1, 3, 0];
+
+    // Create a pipeline to be used by different index formats.
+    const kPrimitiveTopology = 'triangle-list';
+    const pipeline = t.MakeRenderPipeline(kPrimitiveTopology);
+
+    const expectedTextureValues = t.CreateExpectedUint8Array(kBottomLeftTriangle);
+
+    const colorAttachment = t.device.createTexture({
+      format: kTextureFormat,
+      size: { width: kWidth, height: kHeight, depthOrArrayLayers: 1 },
+      usage: GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    const result = t.device.createBuffer({
+      size: byteLength,
+      usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    let encoder = t.device.createCommandEncoder();
+    {
+      const indexFormat = 'uint32';
+      const indexOffset = 12;
+      const indexCount = 7;
+      const indexBuffer = t.CreateIndexBuffer(indices, indexFormat);
+
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [
+          {
+            view: colorAttachment.createView(),
+            clearValue: [0, 0, 0, 0],
+            loadOp: 'clear',
+            storeOp: 'store',
+          },
+        ],
+      });
+
+      pass.setIndexBuffer(indexBuffer, indexFormat, indexOffset);
+      pass.setPipeline(pipeline);
+      pass.drawIndexed(indexCount);
+      pass.end();
+      encoder.copyTextureToBuffer(
+        { texture: colorAttachment },
+        { buffer: result, bytesPerRow, rowsPerImage },
+        [kWidth, kHeight]
+      );
+    }
+    t.device.queue.submit([encoder.finish()]);
+    t.expectGPUBufferValuesEqual(result, expectedTextureValues);
+
+    // Call setIndexBuffer with the pipeline and a different index format buffer.
+    encoder = t.device.createCommandEncoder();
+    {
+      const indexFormat = 'uint16';
+      const indexOffset = 6;
+      const indexCount = 6;
+      const indexBuffer = t.CreateIndexBuffer(indices, indexFormat);
+
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [
+          {
+            view: colorAttachment.createView(),
+            clearValue: [0, 0, 0, 0],
+            loadOp: 'clear',
+            storeOp: 'store',
+          },
+        ],
+      });
+
+      pass.setIndexBuffer(indexBuffer, indexFormat, indexOffset);
+      pass.setPipeline(pipeline);
+      pass.drawIndexed(indexCount);
+      pass.end();
+      encoder.copyTextureToBuffer(
+        { texture: colorAttachment },
+        { buffer: result, bytesPerRow, rowsPerImage },
+        [kWidth, kHeight]
+      );
+    }
+    t.device.queue.submit([encoder.finish()]);
+    t.expectGPUBufferValuesEqual(result, expectedTextureValues);
   });
 
 g.test('primitive_restart')
@@ -316,10 +517,10 @@ is different from what you would get if the topology were incorrect.
         |########|
 `
   )
-  .params(
-    params()
-      .combine(poptions('indexFormat', ['uint16', 'uint32'] as const))
-      .combine([
+  .params(u =>
+    u //
+      .combine('indexFormat', ['uint16', 'uint32'] as const)
+      .combineWithParams([
         {
           primitiveTopology: 'point-list',
           _indices: [0, 1, -1, 2, 3, 0],
@@ -379,5 +580,5 @@ is different from what you would get if the topology were incorrect.
     const result = t.run(indexBuffer, _indices.length, indexFormat, 0, primitiveTopology);
 
     const expectedTextureValues = t.CreateExpectedUint8Array(_expectedShape);
-    t.expectContents(result, expectedTextureValues);
+    t.expectGPUBufferValuesEqual(result, expectedTextureValues);
   });

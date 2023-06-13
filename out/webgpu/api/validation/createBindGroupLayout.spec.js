@@ -4,12 +4,14 @@
 createBindGroupLayout validation tests.
 
 TODO: make sure tests are complete.
-`;import { poptions, params } from '../../../common/framework/params_builder.js';
+`;import { kUnitCaseParamsBuilder } from '../../../common/framework/params_builder.js';
 import { makeTestGroup } from '../../../common/framework/test_group.js';
 import {
-kMaxBindingsPerBindGroup,
+kLimitInfo,
 kShaderStages,
 kShaderStageCombinations,
+kStorageTextureAccessValues,
+kTextureSampleTypes,
 kTextureViewDimensions,
 allBindingEntries,
 bindingTypeInfo,
@@ -17,6 +19,7 @@ bufferBindingTypeInfo,
 kBufferBindingTypes } from
 
 '../../capability_info.js';
+import { kAllTextureFormats, kTextureFormatInfo } from '../../format_info.js';
 
 import { ValidationTest } from './validation_test.js';
 
@@ -28,11 +31,11 @@ export const g = makeTestGroup(ValidationTest);
 
 g.test('duplicate_bindings').
 desc('Test that uniqueness of binding numbers across entries is enforced.').
-subcases(() => [
+paramsSubcasesOnly([
 { bindings: [0, 1], _valid: true },
 { bindings: [0, 0], _valid: false }]).
 
-fn(async t => {
+fn((t) => {
   const { bindings, _valid } = t.params;
   const entries = [];
 
@@ -40,15 +43,53 @@ fn(async t => {
     entries.push({
       binding,
       visibility: GPUShaderStage.COMPUTE,
-      buffer: { type: 'storage' } });
-
+      buffer: { type: 'storage' }
+    });
   }
 
   t.expectValidationError(() => {
     t.device.createBindGroupLayout({
-      entries });
-
+      entries
+    });
   }, !_valid);
+});
+
+g.test('maximum_binding_limit').
+desc(
+`
+  Test that a validation error is generated if the binding number exceeds the maximum binding limit.
+
+  TODO: Need to also test with higher limits enabled on the device, once we have a way to do that.
+  `).
+
+paramsSubcasesOnly((u) =>
+u //
+.combine('binding', [
+1,
+4,
+8,
+256,
+kLimitInfo.maxBindingsPerBindGroup.default - 1,
+kLimitInfo.maxBindingsPerBindGroup.default])).
+
+
+fn((t) => {
+  const { binding } = t.params;
+  const entries = [];
+
+  entries.push({
+    binding,
+    visibility: GPUShaderStage.COMPUTE,
+    buffer: { type: 'storage' }
+  });
+
+  const success = binding < kLimitInfo.maxBindingsPerBindGroup.default;
+
+  t.expectValidationError(() => {
+    t.device.createBindGroupLayout({
+      entries
+    });
+  }, !success);
 });
 
 g.test('visibility').
@@ -58,9 +99,13 @@ desc(
     - Test each possible combination of shader stage visibilities.
     - Test each type of bind group resource.`).
 
-cases(poptions('visibility', kShaderStageCombinations)).
-subcases(() => poptions('entry', allBindingEntries(false))).
-fn(async t => {
+params((u) =>
+u.
+combine('visibility', kShaderStageCombinations).
+beginSubcases().
+combine('entry', allBindingEntries(false))).
+
+fn((t) => {
   const { visibility, entry } = t.params;
   const info = bindingTypeInfo(entry);
 
@@ -68,18 +113,94 @@ fn(async t => {
 
   t.expectValidationError(() => {
     t.device.createBindGroupLayout({
-      entries: [{ binding: 0, visibility, ...entry }] });
+      entries: [{ binding: 0, visibility, ...entry }]
+    });
+  }, !success);
+});
 
+g.test('visibility,VERTEX_shader_stage_buffer_type').
+desc(
+`
+  Test that a validation error is generated if the buffer type is 'storage' when the
+  visibility of the entry includes VERTEX.
+  `).
+
+params((u) =>
+u //
+.combine('shaderStage', kShaderStageCombinations).
+beginSubcases().
+combine('type', kBufferBindingTypes)).
+
+fn((t) => {
+  const { shaderStage, type } = t.params;
+
+  const success = !(type === 'storage' && shaderStage & GPUShaderStage.VERTEX);
+
+  t.expectValidationError(() => {
+    t.device.createBindGroupLayout({
+      entries: [
+      {
+        binding: 0,
+        visibility: shaderStage,
+        buffer: { type }
+      }]
+
+    });
+  }, !success);
+});
+
+g.test('visibility,VERTEX_shader_stage_storage_texture_access').
+desc(
+`
+  Test that a validation error is generated if the access value is 'write-only' when the
+  visibility of the entry includes VERTEX.
+  `).
+
+params((u) =>
+u //
+.combine('shaderStage', kShaderStageCombinations).
+beginSubcases().
+combine('access', [undefined, ...kStorageTextureAccessValues])).
+
+fn((t) => {
+  const { shaderStage, access } = t.params;
+
+  const success = !(
+  (access ?? 'write-only') === 'write-only' && shaderStage & GPUShaderStage.VERTEX);
+
+
+  t.expectValidationError(() => {
+    t.device.createBindGroupLayout({
+      entries: [
+      {
+        binding: 0,
+        visibility: shaderStage,
+        storageTexture: { access, format: 'rgba8unorm' }
+      }]
+
+    });
   }, !success);
 });
 
 g.test('multisampled_validation').
-desc('Test that multisampling is only allowed with "2d" view dimensions.').
-subcases(() => poptions('viewDimension', [undefined, ...kTextureViewDimensions])).
-fn(async t => {
-  const { viewDimension } = t.params;
+desc(
+`
+  Test that multisampling is only allowed if view dimensions is "2d" and the sampleType is not
+  "float".
+  `).
 
-  const success = viewDimension === '2d' || viewDimension === undefined;
+params((u) =>
+u //
+.combine('viewDimension', [undefined, ...kTextureViewDimensions]).
+beginSubcases().
+combine('sampleType', [undefined, ...kTextureSampleTypes])).
+
+fn((t) => {
+  const { viewDimension, sampleType } = t.params;
+
+  const success =
+  (viewDimension === '2d' || viewDimension === undefined) &&
+  (sampleType ?? 'float') !== 'float';
 
   t.expectValidationError(() => {
     t.device.createBindGroupLayout({
@@ -87,10 +208,10 @@ fn(async t => {
       {
         binding: 0,
         visibility: GPUShaderStage.COMPUTE,
-        texture: { multisampled: true, viewDimension } }] });
+        texture: { multisampled: true, viewDimension, sampleType }
+      }]
 
-
-
+    });
   }, !success);
 });
 
@@ -102,13 +223,14 @@ desc(
     - Test creation of a bind group layout using the maximum number of dynamic buffers + 1 fails.
     - TODO(#230): Update to enforce per-stage and per-pipeline-layout limits on BGLs as well.`).
 
-cases(poptions('type', kBufferBindingTypes)).
-subcases(() =>
-params().
-combine(poptions('extraDynamicBuffers', [0, 1])).
-combine(poptions('staticBuffers', [0, 1]))).
+params((u) =>
+u.
+combine('type', kBufferBindingTypes).
+beginSubcases().
+combine('extraDynamicBuffers', [0, 1]).
+combine('staticBuffers', [0, 1])).
 
-fn(async t => {
+fn((t) => {
   const { type, extraDynamicBuffers, staticBuffers } = t.params;
   const info = bufferBindingTypeInfo({ type });
 
@@ -119,21 +241,21 @@ fn(async t => {
     entries.push({
       binding: i,
       visibility: GPUShaderStage.COMPUTE,
-      buffer: { type, hasDynamicOffset: true } });
-
+      buffer: { type, hasDynamicOffset: true }
+    });
   }
 
   for (let i = dynamicBufferCount; i < dynamicBufferCount + staticBuffers; i++) {
     entries.push({
       binding: i,
       visibility: GPUShaderStage.COMPUTE,
-      buffer: { type, hasDynamicOffset: false } });
-
+      buffer: { type, hasDynamicOffset: false }
+    });
   }
 
   const descriptor = {
-    entries };
-
+    entries
+  };
 
   t.expectValidationError(() => {
     t.device.createBindGroupLayout(descriptor);
@@ -141,18 +263,15 @@ fn(async t => {
 });
 
 /**
-     * One bind group layout will be filled with kPerStageBindingLimit[...] of the type |type|.
-     * For each item in the array returned here, a case will be generated which tests a pipeline
-     * layout with one extra bind group layout with one extra binding. That extra binding will have:
-     *
-     *   - If extraTypeSame, any of the binding types which counts toward the same limit as |type|.
-     *     (i.e. 'storage-buffer' <-> 'readonly-storage-buffer').
-     *   - Otherwise, an arbitrary other type.
-     */
-function* pickExtraBindingTypesForPerStage(
-entry,
-extraTypeSame)
-{
+ * One bind group layout will be filled with kPerStageBindingLimit[...] of the type |type|.
+ * For each item in the array returned here, a case will be generated which tests a pipeline
+ * layout with one extra bind group layout with one extra binding. That extra binding will have:
+ *
+ *   - If extraTypeSame, any of the binding types which counts toward the same limit as |type|.
+ *     (i.e. 'storage-buffer' <-> 'readonly-storage-buffer').
+ *   - Otherwise, an arbitrary other type.
+ */
+function* pickExtraBindingTypesForPerStage(entry, extraTypeSame) {
   if (extraTypeSame) {
     const info = bindingTypeInfo(entry);
     for (const extra of allBindingEntries(false)) {
@@ -162,23 +281,23 @@ extraTypeSame)
       }
     }
   } else {
-    return entry.sampler ? { texture: {} } : { sampler: {} };
+    yield entry.sampler ? { texture: {} } : { sampler: {} };
   }
 }
 
-function subcasesForMaxResourcesPerStageTests(caseParams) {
-  return params().
-  combine(poptions('maxedVisibility', kShaderStages)).
-  filter(p => (bindingTypeInfo(caseParams.maxedEntry).validStages & p.maxedVisibility) !== 0).
-  expand(function* () {
-    yield* poptions('extraEntry', pickExtraBindingTypesForPerStage(caseParams.maxedEntry, true));
-    yield* poptions('extraEntry', pickExtraBindingTypesForPerStage(caseParams.maxedEntry, false));
-  }).
-  combine(poptions('extraVisibility', kShaderStages)).
-  filter(p => (bindingTypeInfo(p.extraEntry).validStages & p.extraVisibility) !== 0);
-}
+const kMaxResourcesCases = kUnitCaseParamsBuilder.
+combine('maxedEntry', allBindingEntries(false)).
+beginSubcases().
+combine('maxedVisibility', kShaderStages).
+filter((p) => (bindingTypeInfo(p.maxedEntry).validStages & p.maxedVisibility) !== 0).
+expand('extraEntry', (p) => [
+...pickExtraBindingTypesForPerStage(p.maxedEntry, true),
+...pickExtraBindingTypesForPerStage(p.maxedEntry, false)]).
 
-// Should never fail unless kMaxBindingsPerBindGroup is exceeded, because the validation for
+combine('extraVisibility', kShaderStages).
+filter((p) => (bindingTypeInfo(p.extraEntry).validStages & p.extraVisibility) !== 0);
+
+// Should never fail unless kLimitInfo.maxBindingsPerBindGroup.default is exceeded, because the validation for
 // resources-of-type-per-stage is in pipeline layout creation.
 g.test('max_resources_per_stage,in_bind_group_layout').
 desc(
@@ -190,20 +309,20 @@ desc(
     - Test that creation of a bind group layout using the maximum number of bindings + 1 fails.
     - TODO(#230): Update to enforce per-stage and per-pipeline-layout limits on BGLs as well.`).
 
-cases(poptions('maxedEntry', allBindingEntries(false))).
-subcases(cp => subcasesForMaxResourcesPerStageTests(cp)).
-fn(async t => {
+params(kMaxResourcesCases).
+fn((t) => {
   const { maxedEntry, extraEntry, maxedVisibility, extraVisibility } = t.params;
   const maxedTypeInfo = bindingTypeInfo(maxedEntry);
   const maxedCount = maxedTypeInfo.perStageLimitClass.max;
+  const extraTypeInfo = bindingTypeInfo(extraEntry);
 
   const maxResourceBindings = [];
   for (let i = 0; i < maxedCount; i++) {
     maxResourceBindings.push({
       binding: i,
       visibility: maxedVisibility,
-      ...maxedEntry });
-
+      ...maxedEntry
+    });
   }
 
   const goodDescriptor = { entries: maxResourceBindings };
@@ -211,18 +330,21 @@ fn(async t => {
   // Control
   t.device.createBindGroupLayout(goodDescriptor);
 
+  // Add an entry counting towards the same limit. It should produce a validation error.
   const newDescriptor = clone(goodDescriptor);
   newDescriptor.entries.push({
     binding: maxedCount,
     visibility: extraVisibility,
-    ...extraEntry });
+    ...extraEntry
+  });
 
-
-  const shouldError = maxedCount >= kMaxBindingsPerBindGroup;
+  const newBindingCountsTowardSamePerStageLimit =
+  (maxedVisibility & extraVisibility) !== 0 &&
+  maxedTypeInfo.perStageLimitClass.class === extraTypeInfo.perStageLimitClass.class;
 
   t.expectValidationError(() => {
     t.device.createBindGroupLayout(newDescriptor);
-  }, shouldError);
+  }, newBindingCountsTowardSamePerStageLimit);
 });
 
 // One pipeline layout can have a maximum number of each type of binding *per stage* (which is
@@ -238,9 +360,8 @@ desc(
     - Test that creation of a pipeline using the maximum number of bindings + 1 fails.
   `).
 
-cases(poptions('maxedEntry', allBindingEntries(false))).
-subcases(cp => subcasesForMaxResourcesPerStageTests(cp)).
-fn(async t => {
+params(kMaxResourcesCases).
+fn((t) => {
   const { maxedEntry, extraEntry, maxedVisibility, extraVisibility } = t.params;
   const maxedTypeInfo = bindingTypeInfo(maxedEntry);
   const maxedCount = maxedTypeInfo.perStageLimitClass.max;
@@ -251,8 +372,8 @@ fn(async t => {
     maxResourceBindings.push({
       binding: i,
       visibility: maxedVisibility,
-      ...maxedEntry });
-
+      ...maxedEntry
+    });
   }
 
   const goodLayout = t.device.createBindGroupLayout({ entries: maxResourceBindings });
@@ -265,19 +386,73 @@ fn(async t => {
     {
       binding: 0,
       visibility: extraVisibility,
-      ...extraEntry }] });
+      ...extraEntry
+    }]
 
-
-
+  });
 
   // Some binding types use the same limit, e.g. 'storage-buffer' and 'readonly-storage-buffer'.
   const newBindingCountsTowardSamePerStageLimit =
   (maxedVisibility & extraVisibility) !== 0 &&
   maxedTypeInfo.perStageLimitClass.class === extraTypeInfo.perStageLimitClass.class;
-  const layoutExceedsPerStageLimit = newBindingCountsTowardSamePerStageLimit;
 
   t.expectValidationError(() => {
     t.device.createPipelineLayout({ bindGroupLayouts: [goodLayout, extraLayout] });
-  }, layoutExceedsPerStageLimit);
+  }, newBindingCountsTowardSamePerStageLimit);
+});
+
+g.test('storage_texture,layout_dimension').
+desc(
+`
+  Test that viewDimension is not cube or cube-array if storageTextureLayout is not undefined.
+  `).
+
+params((u) =>
+u //
+.combine('viewDimension', [undefined, ...kTextureViewDimensions])).
+
+fn((t) => {
+  const { viewDimension } = t.params;
+
+  const success = viewDimension !== 'cube' && viewDimension !== `cube-array`;
+
+  t.expectValidationError(() => {
+    t.device.createBindGroupLayout({
+      entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { format: 'rgba8unorm', viewDimension }
+      }]
+
+    });
+  }, !success);
+});
+
+g.test('storage_texture,formats').
+desc(
+`
+  Test that a validation error is generated if the format doesn't support the storage usage.
+  `).
+
+params((u) => u.combine('format', kAllTextureFormats)).
+beforeAllSubcases((t) => {
+  t.selectDeviceForTextureFormatOrSkipTestCase(t.params.format);
+}).
+fn((t) => {
+  const { format } = t.params;
+  const info = kTextureFormatInfo[format];
+
+  t.expectValidationError(() => {
+    t.device.createBindGroupLayout({
+      entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { format }
+      }]
+
+    });
+  }, !info.color?.storage);
 });
 //# sourceMappingURL=createBindGroupLayout.spec.js.map
