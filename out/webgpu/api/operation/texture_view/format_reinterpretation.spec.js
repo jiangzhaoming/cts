@@ -103,6 +103,10 @@ filter(
 ({ format, viewFormat }) => format !== viewFormat && viewCompatible(format, viewFormat))).
 
 
+beforeAllSubcases((t) => {
+  const { format, viewFormat } = t.params;
+  t.skipIfTextureFormatNotSupported(format, viewFormat);
+}).
 fn((t) => {
   const { format, viewFormat } = t.params;
 
@@ -200,6 +204,10 @@ filter(
 
 combine('sampleCount', [1, 4])).
 
+beforeAllSubcases((t) => {
+  const { format, viewFormat } = t.params;
+  t.skipIfTextureFormatNotSupported(format, viewFormat);
+}).
 fn((t) => {
   const { format, viewFormat, sampleCount } = t.params;
 

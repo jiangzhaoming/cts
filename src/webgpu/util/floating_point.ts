@@ -8,6 +8,7 @@ import {
   f16,
   f32,
   f64,
+  isFloatType,
   reinterpretF16AsU16,
   reinterpretF32AsU32,
   reinterpretF64AsU32s,
@@ -15,6 +16,7 @@ import {
   reinterpretU32AsF32,
   reinterpretU32sAsF64,
   Scalar,
+  ScalarType,
   toMatrix,
   toVector,
   u32,
@@ -613,7 +615,8 @@ interface FPConstants {
   };
 }
 
-abstract class FPTraits {
+/** Abstract base class for all floating-point traits */
+export abstract class FPTraits {
   public readonly kind: FPKind;
   protected constructor(k: FPKind) {
     this.kind = k;
@@ -1085,7 +1088,7 @@ abstract class FPTraits {
    * @param filter what interval filtering to apply
    * @param ops callbacks that implement generating an acceptance interval
    */
-  private makeScalarTripleToIntervalCase(
+  public makeScalarTripleToIntervalCase(
     param0: number,
     param1: number,
     param2: number,
@@ -3270,12 +3273,18 @@ abstract class FPTraits {
       // This is how other shading languages operate and allows for a desirable
       // wrap around in graphics programming.
       const result = this.subtractionInterval(n, this.floorInterval(n));
+      assert(
+        // negative.subnormal.min instead of 0, because FTZ can occur
+        // selectively during the calculation
+        this.toInterval([this.constants().negative.subnormal.min, 1.0]).contains(result),
+        `fract(${n}) interval [${result}] unexpectedly extends beyond [~0.0, 1.0]`
+      );
       if (result.contains(1)) {
         // Very small negative numbers can lead to catastrophic cancellation,
         // thus calculating a fract of 1.0, which is technically not a
         // fractional part, so some implementations clamp the result to next
         // nearest number.
-        return this.spanIntervals(result, this.toInterval(kValue.f32.positive.less_than_one));
+        return this.spanIntervals(result, this.toInterval(this.constants().positive.less_than_one));
       }
       return result;
     },
@@ -4388,7 +4397,7 @@ class F32Traits extends FPTraits {
       'unpack2x16snormInterval only accepts values on the bounds of u32'
     );
     const op = (n: number): FPInterval => {
-      return this.maxInterval(this.divisionInterval(n, 32767), -1);
+      return this.ulpInterval(Math.max(n / 32767, -1), 3);
     };
 
     this.unpackDataU32[0] = n;
@@ -4404,7 +4413,7 @@ class F32Traits extends FPTraits {
       'unpack2x16unormInterval only accepts values on the bounds of u32'
     );
     const op = (n: number): FPInterval => {
-      return this.divisionInterval(n, 65535);
+      return this.correctlyRoundedInterval(n / 65535);
     };
 
     this.unpackDataU32[0] = n;
@@ -4420,7 +4429,7 @@ class F32Traits extends FPTraits {
       'unpack4x8snormInterval only accepts values on the bounds of u32'
     );
     const op = (n: number): FPInterval => {
-      return this.maxInterval(this.divisionInterval(n, 127), -1);
+      return this.correctlyRoundedInterval(Math.max(n / 127, -1));
     };
     this.unpackDataU32[0] = n;
     return [
@@ -4440,7 +4449,7 @@ class F32Traits extends FPTraits {
       'unpack4x8unormInterval only accepts values on the bounds of u32'
     );
     const op = (n: number): FPInterval => {
-      return this.divisionInterval(n, 255);
+      return this.correctlyRoundedInterval(n / 255);
     };
 
     this.unpackDataU32[0] = n;
@@ -4864,7 +4873,7 @@ class F16Traits extends FPTraits {
   public readonly ulpInterval = this.ulpIntervalImpl.bind(this);
 
   // Framework - API - Overrides
-  public readonly absInterval = this.unimplementedScalarToInterval.bind(this);
+  public readonly absInterval = this.absIntervalImpl.bind(this);
   public readonly acosInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly acoshAlternativeInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly acoshPrimaryInterval = this.unimplementedScalarToInterval.bind(this);
@@ -4876,7 +4885,7 @@ class F16Traits extends FPTraits {
   public readonly atanInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly atan2Interval = this.unimplementedScalarPairToInterval.bind(this);
   public readonly atanhInterval = this.unimplementedScalarToInterval.bind(this);
-  public readonly ceilInterval = this.unimplementedScalarToInterval.bind(this);
+  public readonly ceilInterval = this.ceilIntervalImpl.bind(this);
   public readonly clampMedianInterval = this.unimplementedScalarTripleToInterval.bind(this);
   public readonly clampMinMaxInterval = this.unimplementedScalarTripleToInterval.bind(this);
   public readonly clampIntervals = [this.clampMedianInterval, this.clampMinMaxInterval];
@@ -4891,7 +4900,7 @@ class F16Traits extends FPTraits {
   public readonly expInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly exp2Interval = this.unimplementedScalarToInterval.bind(this);
   public readonly faceForwardIntervals = this.unimplementedFaceForward.bind(this);
-  public readonly floorInterval = this.unimplementedScalarToInterval.bind(this);
+  public readonly floorInterval = this.floorIntervalImpl.bind(this);
   public readonly fmaInterval = this.unimplementedScalarTripleToInterval.bind(this);
   public readonly fractInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly inverseSqrtInterval = this.unimplementedScalarToInterval.bind(this);
@@ -4929,7 +4938,7 @@ class F16Traits extends FPTraits {
   public readonly reflectInterval = this.unimplementedVectorPairToVector.bind(this);
   public readonly refractInterval = this.unimplementedRefract.bind(this);
   public readonly remainderInterval = this.unimplementedScalarPairToInterval.bind(this);
-  public readonly roundInterval = this.unimplementedScalarToInterval.bind(this);
+  public readonly roundInterval = this.roundIntervalImpl.bind(this);
   public readonly saturateInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly signInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly sinInterval = this.unimplementedScalarToInterval.bind(this);
@@ -4956,3 +4965,29 @@ export const FP = {
   f16: new F16Traits(),
   abstract: new FPAbstractTraits(),
 };
+
+/** @returns the floating-point traits for @p type */
+export function fpTraitsFor(type: ScalarType): FPTraits {
+  switch (type.kind) {
+    case 'abstract-float':
+      return FP.abstract;
+    case 'f32':
+      return FP.f32;
+    case 'f16':
+      return FP.f16;
+    default:
+      unreachable(`unsupported type: ${type}`);
+  }
+}
+
+/** @returns true if the value @p value is representable with @p type */
+export function isRepresentable(value: number, type: ScalarType) {
+  if (!Number.isFinite(value)) {
+    return false;
+  }
+  if (isFloatType(type)) {
+    const constants = fpTraitsFor(type).constants();
+    return value >= constants.negative.min && value <= constants.positive.max;
+  }
+  assert(false, `isRepresentable() is not yet implemented for type ${type}`);
+}

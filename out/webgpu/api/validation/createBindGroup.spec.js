@@ -313,6 +313,8 @@ fn((t) => {
     dimension: getTextureDimensionFromView(dimension)
   });
 
+  t.skipIfTextureViewDimensionNotSupported(viewDimension, dimension);
+
   const shouldError = viewDimension !== dimension;
   const textureView = texture.createView({ dimension });
 

@@ -67,7 +67,8 @@
     infinity: {
       positive: BigInt(0x7ff0_0000_0000_0000n),
       negative: BigInt(0xfff0_0000_0000_0000n)
-    }
+    },
+    max_ulp: BigInt(0x7ca0_0000_0000_0000n)
   },
 
   // Limits of f32
@@ -116,7 +117,8 @@
     infinity: {
       positive: 0x7f80_0000,
       negative: 0xff80_0000
-    }
+    },
+    max_ulp: 0x7380_0000
   },
 
   // Limits of f16
@@ -165,7 +167,8 @@
     infinity: {
       positive: 0x7c00,
       negative: 0xfc00
-    }
+    },
+    max_ulp: 0x5000
   },
 
   // 32-bit representation of power(2, n) n = {-31, ..., 31}
@@ -417,7 +420,8 @@ export const kValue = {
     infinity: {
       positive: reinterpretU64AsF64(kBit.f64.infinity.positive),
       negative: reinterpretU64AsF64(kBit.f64.infinity.negative)
-    }
+    },
+    max_ulp: reinterpretU64AsF64(kBit.f64.max_ulp)
   },
 
   // Limits of f32
@@ -490,7 +494,9 @@ export const kValue = {
     infinity: {
       positive: reinterpretU32AsF32(kBit.f32.infinity.positive),
       negative: reinterpretU32AsF32(kBit.f32.infinity.negative)
-    }
+    },
+    max_ulp: reinterpretU32AsF32(kBit.f32.max_ulp),
+    emax: 127
   },
 
   // Limits of i16
@@ -581,144 +587,9 @@ export const kValue = {
     infinity: {
       positive: reinterpretU16AsF16(kBit.f16.infinity.positive),
       negative: reinterpretU16AsF16(kBit.f16.infinity.negative)
-    }
-  },
-
-  powTwo: {
-    to0: Math.pow(2, 0),
-    to1: Math.pow(2, 1),
-    to2: Math.pow(2, 2),
-    to3: Math.pow(2, 3),
-    to4: Math.pow(2, 4),
-    to5: Math.pow(2, 5),
-    to6: Math.pow(2, 6),
-    to7: Math.pow(2, 7),
-    to8: Math.pow(2, 8),
-    to9: Math.pow(2, 9),
-    to10: Math.pow(2, 10),
-    to11: Math.pow(2, 11),
-    to12: Math.pow(2, 12),
-    to13: Math.pow(2, 13),
-    to14: Math.pow(2, 14),
-    to15: Math.pow(2, 15),
-    to16: Math.pow(2, 16),
-    to17: Math.pow(2, 17),
-    to18: Math.pow(2, 18),
-    to19: Math.pow(2, 19),
-    to20: Math.pow(2, 20),
-    to21: Math.pow(2, 21),
-    to22: Math.pow(2, 22),
-    to23: Math.pow(2, 23),
-    to24: Math.pow(2, 24),
-    to25: Math.pow(2, 25),
-    to26: Math.pow(2, 26),
-    to27: Math.pow(2, 27),
-    to28: Math.pow(2, 28),
-    to29: Math.pow(2, 29),
-    to30: Math.pow(2, 30),
-    to31: Math.pow(2, 31),
-    to32: Math.pow(2, 32),
-
-    toMinus1: Math.pow(2, -1),
-    toMinus2: Math.pow(2, -2),
-    toMinus3: Math.pow(2, -3),
-    toMinus4: Math.pow(2, -4),
-    toMinus5: Math.pow(2, -5),
-    toMinus6: Math.pow(2, -6),
-    toMinus7: Math.pow(2, -7),
-    toMinus8: Math.pow(2, -8),
-    toMinus9: Math.pow(2, -9),
-    toMinus10: Math.pow(2, -10),
-    toMinus11: Math.pow(2, -11),
-    toMinus12: Math.pow(2, -12),
-    toMinus13: Math.pow(2, -13),
-    toMinus14: Math.pow(2, -14),
-    toMinus15: Math.pow(2, -15),
-    toMinus16: Math.pow(2, -16),
-    toMinus17: Math.pow(2, -17),
-    toMinus18: Math.pow(2, -18),
-    toMinus19: Math.pow(2, -19),
-    toMinus20: Math.pow(2, -20),
-    toMinus21: Math.pow(2, -21),
-    toMinus22: Math.pow(2, -22),
-    toMinus23: Math.pow(2, -23),
-    toMinus24: Math.pow(2, -24),
-    toMinus25: Math.pow(2, -25),
-    toMinus26: Math.pow(2, -26),
-    toMinus27: Math.pow(2, -27),
-    toMinus28: Math.pow(2, -28),
-    toMinus29: Math.pow(2, -29),
-    toMinus30: Math.pow(2, -30),
-    toMinus31: Math.pow(2, -31),
-    toMinus32: Math.pow(2, -32)
-  },
-  negPowTwo: {
-    to0: -Math.pow(2, 0),
-    to1: -Math.pow(2, 1),
-    to2: -Math.pow(2, 2),
-    to3: -Math.pow(2, 3),
-    to4: -Math.pow(2, 4),
-    to5: -Math.pow(2, 5),
-    to6: -Math.pow(2, 6),
-    to7: -Math.pow(2, 7),
-    to8: -Math.pow(2, 8),
-    to9: -Math.pow(2, 9),
-    to10: -Math.pow(2, 10),
-    to11: -Math.pow(2, 11),
-    to12: -Math.pow(2, 12),
-    to13: -Math.pow(2, 13),
-    to14: -Math.pow(2, 14),
-    to15: -Math.pow(2, 15),
-    to16: -Math.pow(2, 16),
-    to17: -Math.pow(2, 17),
-    to18: -Math.pow(2, 18),
-    to19: -Math.pow(2, 19),
-    to20: -Math.pow(2, 20),
-    to21: -Math.pow(2, 21),
-    to22: -Math.pow(2, 22),
-    to23: -Math.pow(2, 23),
-    to24: -Math.pow(2, 24),
-    to25: -Math.pow(2, 25),
-    to26: -Math.pow(2, 26),
-    to27: -Math.pow(2, 27),
-    to28: -Math.pow(2, 28),
-    to29: -Math.pow(2, 29),
-    to30: -Math.pow(2, 30),
-    to31: -Math.pow(2, 31),
-    to32: -Math.pow(2, 32),
-
-    toMinus1: -Math.pow(2, -1),
-    toMinus2: -Math.pow(2, -2),
-    toMinus3: -Math.pow(2, -3),
-    toMinus4: -Math.pow(2, -4),
-    toMinus5: -Math.pow(2, -5),
-    toMinus6: -Math.pow(2, -6),
-    toMinus7: -Math.pow(2, -7),
-    toMinus8: -Math.pow(2, -8),
-    toMinus9: -Math.pow(2, -9),
-    toMinus10: -Math.pow(2, -10),
-    toMinus11: -Math.pow(2, -11),
-    toMinus12: -Math.pow(2, -12),
-    toMinus13: -Math.pow(2, -13),
-    toMinus14: -Math.pow(2, -14),
-    toMinus15: -Math.pow(2, -15),
-    toMinus16: -Math.pow(2, -16),
-    toMinus17: -Math.pow(2, -17),
-    toMinus18: -Math.pow(2, -18),
-    toMinus19: -Math.pow(2, -19),
-    toMinus20: -Math.pow(2, -20),
-    toMinus21: -Math.pow(2, -21),
-    toMinus22: -Math.pow(2, -22),
-    toMinus23: -Math.pow(2, -23),
-    toMinus24: -Math.pow(2, -24),
-    toMinus25: -Math.pow(2, -25),
-    toMinus26: -Math.pow(2, -26),
-    toMinus27: -Math.pow(2, -27),
-    toMinus28: -Math.pow(2, -28),
-    toMinus29: -Math.pow(2, -29),
-    toMinus30: -Math.pow(2, -30),
-    toMinus31: -Math.pow(2, -31),
-    toMinus32: -Math.pow(2, -32)
+    },
+    max_ulp: reinterpretU16AsF16(kBit.f16.max_ulp),
+    emax: 15
   },
 
   // Limits of i8
