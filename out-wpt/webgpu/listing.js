@@ -1650,7 +1650,43 @@ export const listing = [
       "execution",
       "expression",
       "binary",
+      "f16_addition"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "execution",
+      "expression",
+      "binary",
       "f16_comparison"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "execution",
+      "expression",
+      "binary",
+      "f16_division"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "execution",
+      "expression",
+      "binary",
+      "f16_multiplication"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "execution",
+      "expression",
+      "binary",
+      "f16_subtraction"
     ]
   },
   {
@@ -3306,6 +3342,16 @@ export const listing = [
       "expression",
       "call",
       "builtin",
+      "atan2"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "validation",
+      "expression",
+      "call",
+      "builtin",
       "atanh"
     ]
   },
@@ -3622,6 +3668,14 @@ export const listing = [
       "shader",
       "validation",
       "parse",
+      "diagnostic"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "validation",
+      "parse",
       "discard"
     ]
   },
@@ -3647,6 +3701,14 @@ export const listing = [
       "validation",
       "parse",
       "literal"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "validation",
+      "parse",
+      "must_use"
     ]
   },
   {
@@ -3687,14 +3749,6 @@ export const listing = [
       "validation",
       "parse",
       "var_and_let"
-    ]
-  },
-  {
-    "file": [
-      "shader",
-      "validation",
-      "resource_interface",
-      "bindings"
     ]
   },
   {
