@@ -5,9 +5,9 @@
 import { anyOf } from './compare.js';
 import { kValue } from './constants.js';
 import {
+abstractFloat,
 f16,
 f32,
-f64,
 isFloatType,
 reinterpretF16AsU16,
 reinterpretF32AsU32,
@@ -4820,7 +4820,7 @@ class FPAbstractTraits extends FPTraits {
   isSubnormal = isSubnormalNumberF64;
   flushSubnormal = flushSubnormalNumberF64;
   oneULP = oneULPF64;
-  scalarBuilder = f64;
+  scalarBuilder = abstractFloat;
 
   // Framework - Fundamental Error Intervals - Overrides
   absoluteErrorInterval = this.unboundedAbsoluteErrorInterval.bind(this);
@@ -4886,7 +4886,7 @@ class FPAbstractTraits extends FPTraits {
   multiplicationVectorMatrixInterval = this.unimplementedVectorMatrixToVector.bind(
   this);
 
-  negationInterval = this.unimplementedScalarToInterval.bind(this);
+  negationInterval = this.negationIntervalImpl.bind(this);
   normalizeInterval = this.unimplementedVectorToVector.bind(this);
   powInterval = this.unimplementedScalarPairToInterval.bind(this);
   quantizeToF16Interval = this.unimplementedScalarToInterval.bind(this);
@@ -5127,8 +5127,8 @@ class F16Traits extends FPTraits {
   atan2Interval = this.atan2IntervalImpl.bind(this);
   atanhInterval = this.unimplementedScalarToInterval.bind(this);
   ceilInterval = this.ceilIntervalImpl.bind(this);
-  clampMedianInterval = this.unimplementedScalarTripleToInterval.bind(this);
-  clampMinMaxInterval = this.unimplementedScalarTripleToInterval.bind(this);
+  clampMedianInterval = this.clampMedianIntervalImpl.bind(this);
+  clampMinMaxInterval = this.clampMinMaxIntervalImpl.bind(this);
   clampIntervals = [this.clampMedianInterval, this.clampMinMaxInterval];
   cosInterval = this.cosIntervalImpl.bind(this);
   coshInterval = this.unimplementedScalarToInterval.bind(this);
@@ -5181,12 +5181,12 @@ class F16Traits extends FPTraits {
   remainderInterval = this.unimplementedScalarPairToInterval.bind(this);
   roundInterval = this.roundIntervalImpl.bind(this);
   saturateInterval = this.unimplementedScalarToInterval.bind(this);
-  signInterval = this.unimplementedScalarToInterval.bind(this);
+  signInterval = this.signIntervalImpl.bind(this);
   sinInterval = this.sinIntervalImpl.bind(this);
   sinhInterval = this.unimplementedScalarToInterval.bind(this);
   smoothStepInterval = this.unimplementedScalarTripleToInterval.bind(this);
   sqrtInterval = this.sqrtIntervalImpl.bind(this);
-  stepInterval = this.unimplementedScalarPairToInterval.bind(this);
+  stepInterval = this.stepIntervalImpl.bind(this);
   subtractionInterval = this.subtractionIntervalImpl.bind(this);
   subtractionMatrixMatrixInterval = this.unimplementedMatrixPairToMatrix.bind(this);
   tanInterval = this.unimplementedScalarToInterval.bind(this);
