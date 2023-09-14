@@ -4829,13 +4829,13 @@ class FPAbstractTraits extends FPTraits {
   public readonly ulpInterval = this.unboundedUlpInterval.bind(this);
 
   // Framework - API - Overrides
-  public readonly absInterval = this.unimplementedScalarToInterval.bind(this);
+  public readonly absInterval = this.absIntervalImpl.bind(this);
   public readonly acosInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly acoshAlternativeInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly acoshPrimaryInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly acoshIntervals = [this.acoshAlternativeInterval, this.acoshPrimaryInterval];
-  public readonly additionInterval = this.unimplementedScalarPairToInterval.bind(this);
-  public readonly additionMatrixMatrixInterval = this.unimplementedMatrixPairToMatrix.bind(this);
+  public readonly additionInterval = this.additionIntervalImpl.bind(this);
+  public readonly additionMatrixMatrixInterval = this.additionMatrixMatrixIntervalImpl.bind(this);
   public readonly asinInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly asinhInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly atanInterval = this.unimplementedScalarToInterval.bind(this);
@@ -4870,7 +4870,7 @@ class FPAbstractTraits extends FPTraits {
   public readonly mixPreciseInterval = this.unimplementedScalarTripleToInterval.bind(this);
   public readonly mixIntervals = [this.mixImpreciseInterval, this.mixPreciseInterval];
   public readonly modfInterval = this.unimplementedModf.bind(this);
-  public readonly multiplicationInterval = this.unimplementedScalarPairToInterval.bind(this);
+  public readonly multiplicationInterval = this.multiplicationIntervalImpl.bind(this);
   public readonly multiplicationMatrixMatrixInterval = this.unimplementedMatrixPairToMatrix.bind(
     this
   );
@@ -4902,8 +4902,10 @@ class FPAbstractTraits extends FPTraits {
   public readonly smoothStepInterval = this.unimplementedScalarTripleToInterval.bind(this);
   public readonly sqrtInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly stepInterval = this.unimplementedScalarPairToInterval.bind(this);
-  public readonly subtractionInterval = this.unimplementedScalarPairToInterval.bind(this);
-  public readonly subtractionMatrixMatrixInterval = this.unimplementedMatrixPairToMatrix.bind(this);
+  public readonly subtractionInterval = this.subtractionIntervalImpl.bind(this);
+  public readonly subtractionMatrixMatrixInterval = this.subtractionMatrixMatrixIntervalImpl.bind(
+    this
+  );
   public readonly tanInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly tanhInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly transposeInterval = this.unimplementedMatrixToMatrix.bind(this);
@@ -5171,7 +5173,7 @@ class F16Traits extends FPTraits {
   public readonly multiplicationVectorMatrixInterval = this.unimplementedVectorMatrixToVector.bind(
     this
   );
-  public readonly negationInterval = this.unimplementedScalarToInterval.bind(this);
+  public readonly negationInterval = this.negationIntervalImpl.bind(this);
   public readonly normalizeInterval = this.unimplementedVectorToVector.bind(this);
   public readonly powInterval = this.unimplementedScalarPairToInterval.bind(this);
   public readonly quantizeToF16Interval = this.quantizeToF16IntervalNotAvailable.bind(this);

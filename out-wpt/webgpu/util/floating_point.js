@@ -4042,13 +4042,13 @@ class FPAbstractTraits extends FPTraits {
   ulpInterval = this.unboundedUlpInterval.bind(this);
 
   // Framework - API - Overrides
-  absInterval = this.unimplementedScalarToInterval.bind(this);
+  absInterval = this.absIntervalImpl.bind(this);
   acosInterval = this.unimplementedScalarToInterval.bind(this);
   acoshAlternativeInterval = this.unimplementedScalarToInterval.bind(this);
   acoshPrimaryInterval = this.unimplementedScalarToInterval.bind(this);
   acoshIntervals = [this.acoshAlternativeInterval, this.acoshPrimaryInterval];
-  additionInterval = this.unimplementedScalarPairToInterval.bind(this);
-  additionMatrixMatrixInterval = this.unimplementedMatrixPairToMatrix.bind(this);
+  additionInterval = this.additionIntervalImpl.bind(this);
+  additionMatrixMatrixInterval = this.additionMatrixMatrixIntervalImpl.bind(this);
   asinInterval = this.unimplementedScalarToInterval.bind(this);
   asinhInterval = this.unimplementedScalarToInterval.bind(this);
   atanInterval = this.unimplementedScalarToInterval.bind(this);
@@ -4083,7 +4083,7 @@ class FPAbstractTraits extends FPTraits {
   mixPreciseInterval = this.unimplementedScalarTripleToInterval.bind(this);
   mixIntervals = [this.mixImpreciseInterval, this.mixPreciseInterval];
   modfInterval = this.unimplementedModf.bind(this);
-  multiplicationInterval = this.unimplementedScalarPairToInterval.bind(this);
+  multiplicationInterval = this.multiplicationIntervalImpl.bind(this);
   multiplicationMatrixMatrixInterval = this.unimplementedMatrixPairToMatrix.bind(this);
 
   multiplicationMatrixScalarInterval = this.unimplementedMatrixScalarToMatrix.bind(this);
@@ -4110,8 +4110,9 @@ class FPAbstractTraits extends FPTraits {
   smoothStepInterval = this.unimplementedScalarTripleToInterval.bind(this);
   sqrtInterval = this.unimplementedScalarToInterval.bind(this);
   stepInterval = this.unimplementedScalarPairToInterval.bind(this);
-  subtractionInterval = this.unimplementedScalarPairToInterval.bind(this);
-  subtractionMatrixMatrixInterval = this.unimplementedMatrixPairToMatrix.bind(this);
+  subtractionInterval = this.subtractionIntervalImpl.bind(this);
+  subtractionMatrixMatrixInterval = this.subtractionMatrixMatrixIntervalImpl.bind(this);
+
   tanInterval = this.unimplementedScalarToInterval.bind(this);
   tanhInterval = this.unimplementedScalarToInterval.bind(this);
   transposeInterval = this.unimplementedMatrixToMatrix.bind(this);
@@ -4389,7 +4390,7 @@ class F16Traits extends FPTraits {
 
   multiplicationVectorMatrixInterval = this.unimplementedVectorMatrixToVector.bind(this);
 
-  negationInterval = this.unimplementedScalarToInterval.bind(this);
+  negationInterval = this.negationIntervalImpl.bind(this);
   normalizeInterval = this.unimplementedVectorToVector.bind(this);
   powInterval = this.unimplementedScalarPairToInterval.bind(this);
   quantizeToF16Interval = this.quantizeToF16IntervalNotAvailable.bind(this);

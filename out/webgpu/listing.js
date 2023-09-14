@@ -1629,6 +1629,15 @@ export const listing = [
       "compat",
       "api",
       "validation",
+      "render_pipeline",
+      "vertex_state"
+    ]
+  },
+  {
+    "file": [
+      "compat",
+      "api",
+      "validation",
       "texture",
       "createTexture"
     ]
@@ -1679,7 +1688,52 @@ export const listing = [
       "execution",
       "expression",
       "binary",
+      "af_addition"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "execution",
+      "expression",
+      "binary",
       "af_comparison"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "execution",
+      "expression",
+      "binary",
+      "af_matrix_addition"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "execution",
+      "expression",
+      "binary",
+      "af_matrix_subtraction"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "execution",
+      "expression",
+      "binary",
+      "af_multiplication"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "execution",
+      "expression",
+      "binary",
+      "af_subtraction"
     ]
   },
   {
@@ -3034,6 +3088,15 @@ export const listing = [
       "expression",
       "unary",
       "bool_logical"
+    ]
+  },
+  {
+    "file": [
+      "shader",
+      "execution",
+      "expression",
+      "unary",
+      "f16_arithmetic"
     ]
   },
   {

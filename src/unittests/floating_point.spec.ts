@@ -2168,6 +2168,7 @@ const kAbsIntervalCases = [
     expected: {
       f32: [reinterpretU32AsF32(0x3dcccccc), reinterpretU32AsF32(0x3dcccccd)],
       f16: [reinterpretU16AsF16(0x2e66), reinterpretU16AsF16(0x2e67)],
+      abstract: 0.1,
     },
   },
   {
@@ -2175,6 +2176,7 @@ const kAbsIntervalCases = [
     expected: {
       f32: [reinterpretU32AsF32(0x3dcccccc), reinterpretU32AsF32(0x3dcccccd)],
       f16: [reinterpretU16AsF16(0x2e66), reinterpretU16AsF16(0x2e67)],
+      abstract: 0.1,
     },
   },
 ] as const;
@@ -2182,7 +2184,7 @@ const kAbsIntervalCases = [
 g.test('absInterval')
   .params(u =>
     u
-      .combine('trait', ['f32', 'f16'] as const)
+      .combine('trait', ['f32', 'f16', 'abstract'] as const)
       .beginSubcases()
       .expandWithParams<ScalarToIntervalCase>(p => {
         const constants = FP[p.trait].constants();
@@ -2201,15 +2203,11 @@ g.test('absInterval')
           { input: constants.negative.min, expected: constants.positive.max },
           { input: constants.negative.max, expected: constants.positive.min },
 
-          // 32-bit subnormals
+          // Subnormals
           { input: constants.positive.subnormal.max, expected: [0, constants.positive.subnormal.max] },
           { input: constants.positive.subnormal.min, expected: [0, constants.positive.subnormal.min] },
           { input: constants.negative.subnormal.min, expected: [0, constants.positive.subnormal.max] },
           { input: constants.negative.subnormal.max, expected: [0, constants.positive.subnormal.min] },
-
-          // 64-bit subnormals
-          { input: reinterpretU64AsF64(0x0000_0000_0000_0001n), expected: [0, constants.positive.subnormal.min] },
-          { input: reinterpretU64AsF64(0x800f_ffff_ffff_ffffn), expected: [0, constants.positive.subnormal.min] },
 
           // Zero
           { input: 0, expected: 0 },
@@ -2557,33 +2555,33 @@ g.test('ceilInterval')
         const constants = FP[p.trait].constants();
         // prettier-ignore
         return [
-        { input: 0, expected: 0 },
-        { input: 0.1, expected: 1 },
-        { input: 0.9, expected: 1 },
-        { input: 1.0, expected: 1 },
-        { input: 1.1, expected: 2 },
-        { input: 1.9, expected: 2 },
-        { input: -0.1, expected: 0 },
-        { input: -0.9, expected: 0 },
-        { input: -1.0, expected: -1 },
-        { input: -1.1, expected: -1 },
-        { input: -1.9, expected: -1 },
+          { input: 0, expected: 0 },
+          { input: 0.1, expected: 1 },
+          { input: 0.9, expected: 1 },
+          { input: 1.0, expected: 1 },
+          { input: 1.1, expected: 2 },
+          { input: 1.9, expected: 2 },
+          { input: -0.1, expected: 0 },
+          { input: -0.9, expected: 0 },
+          { input: -1.0, expected: -1 },
+          { input: -1.1, expected: -1 },
+          { input: -1.9, expected: -1 },
 
-        // Edge cases
-        { input: constants.positive.infinity, expected: kUnboundedBounds },
-        { input: constants.negative.infinity, expected: kUnboundedBounds },
-        { input: constants.positive.max, expected: constants.positive.max },
-        { input: constants.positive.min, expected: 1 },
-        { input: constants.negative.min, expected: constants.negative.min },
-        { input: constants.negative.max, expected: 0 },
-        ...kCeilIntervalCases[p.trait],
+          // Edge cases
+          { input: constants.positive.infinity, expected: kUnboundedBounds },
+          { input: constants.negative.infinity, expected: kUnboundedBounds },
+          { input: constants.positive.max, expected: constants.positive.max },
+          { input: constants.positive.min, expected: 1 },
+          { input: constants.negative.min, expected: constants.negative.min },
+          { input: constants.negative.max, expected: 0 },
+          ...kCeilIntervalCases[p.trait],
 
-        // 32-bit subnormals
-        { input: constants.positive.subnormal.max, expected: [0, 1] },
-        { input: constants.positive.subnormal.min, expected: [0, 1] },
-        { input: constants.negative.subnormal.min, expected: 0 },
-        { input: constants.negative.subnormal.max, expected: 0 },
-      ];
+          // 32-bit subnormals
+          { input: constants.positive.subnormal.max, expected: [0, 1] },
+          { input: constants.positive.subnormal.min, expected: [0, 1] },
+          { input: constants.negative.subnormal.min, expected: 0 },
+          { input: constants.negative.subnormal.max, expected: 0 },
+        ];
       })
   )
   .fn(t => {
@@ -3110,6 +3108,27 @@ const kNegationIntervalCases = {
     { input: kValue.f32.subnormal.negative.min, expected: [0, kValue.f32.subnormal.positive.max] },
     { input: kValue.f32.subnormal.negative.max, expected: [0, kValue.f32.subnormal.positive.min] },
   ] as ScalarToIntervalCase[],
+  f16: [
+    // Edge cases
+    { input: kValue.f16.infinity.positive, expected: kUnboundedBounds },
+    { input: kValue.f16.infinity.negative, expected: kUnboundedBounds },
+    { input: kValue.f16.positive.max, expected: kValue.f16.negative.min },
+    { input: kValue.f16.positive.min, expected: kValue.f16.negative.max },
+    { input: kValue.f16.negative.min, expected: kValue.f16.positive.max },
+    { input: kValue.f16.negative.max, expected: kValue.f16.positive.min },
+
+    // Normals
+    { input: 0.1, expected: [kMinusOneULPFunctions['f16'](reinterpretU16AsF16(0xae66)), reinterpretU16AsF16(0xae66)] }, // ~-0.1
+    { input: 1.9, expected: [reinterpretU16AsF16(0xbf9a), kPlusOneULPFunctions['f16'](reinterpretU16AsF16(0xbf9a))] },  // ~-1.9
+    { input: -0.1, expected: [reinterpretU16AsF16(0x2e66), kPlusOneULPFunctions['f16'](reinterpretU16AsF16(0x2e66))] }, // ~0.1
+    { input: -1.9, expected: [kMinusOneULPFunctions['f16'](reinterpretU16AsF16(0x3f9a)), reinterpretU16AsF16(0x3f9a)] },  // ~1.9
+
+    // Subnormals
+    { input: kValue.f16.subnormal.positive.max, expected: [kValue.f16.subnormal.negative.min, 0] },
+    { input: kValue.f16.subnormal.positive.min, expected: [kValue.f16.subnormal.negative.max, 0] },
+    { input: kValue.f16.subnormal.negative.min, expected: [0, kValue.f16.subnormal.positive.max] },
+    { input: kValue.f16.subnormal.negative.max, expected: [0, kValue.f16.subnormal.positive.min] },
+  ] as ScalarToIntervalCase[],
   abstract: [
     // Edge cases
     { input: kValue.f64.infinity.positive, expected: kUnboundedBounds },
@@ -3136,7 +3155,7 @@ const kNegationIntervalCases = {
 g.test('negationInterval')
   .params(u =>
     u
-      .combine('trait', ['f32', 'abstract'] as const)
+      .combine('trait', ['f32', 'f16', 'abstract'] as const)
       .beginSubcases()
       .expandWithParams<ScalarToIntervalCase>(p => {
         // prettier-ignore
@@ -3670,12 +3689,27 @@ const kAdditionInterval64BitsNormalCases = {
     // -0.1+0.1 expect f16 interval [0xAE67+0x2E66, 0xAE66+0x2E67]
     { input: [-0.1, 0.1], expected: [reinterpretU16AsF16(0xae67)+reinterpretU16AsF16(0x2e66), reinterpretU16AsF16(0xae66)+reinterpretU16AsF16(0x2e67)] },  // ~0.0
   ] as ScalarPairToIntervalCase[],
+  abstract: [
+    // 0.1 isn't exactly representable in f64, but will be quantized to an
+    // exact value when storing to a 'number' (0x3FB999999999999A).
+    // This is why below the expectations are not intervals.
+    { input: [0.1, 0], expected: 0.1 },
+    { input: [0, 0.1], expected: 0.1 },
+    { input: [-0.1, 0], expected: -0.1 },
+    { input: [0, -0.1], expected: -0.1 },
+    // f64 0x3FB999999999999A+0x3FB999999999999A = 0x3FC999999999999A
+    { input: [0.1, 0.1], expected: reinterpretU64AsF64(0x3FC999999999999An) },  // ~0.2
+    // f64 0xBFB999999999999A+0xBFB999999999999A = 0xBFC999999999999A
+    { input: [-0.1, -0.1], expected: reinterpretU64AsF64(0xBFC999999999999An) },  // ~-0.2
+    { input: [0.1, -0.1], expected: 0 },
+    { input: [-0.1, 0.1], expected: 0 },
+  ] as ScalarPairToIntervalCase[],
 } as const;
 
 g.test('additionInterval')
   .params(u =>
     u
-      .combine('trait', ['f32', 'f16'] as const)
+      .combine('trait', ['f32', 'f16', 'abstract'] as const)
       .beginSubcases()
       .expandWithParams<ScalarPairToIntervalCase>(p => {
         const trait = FP[p.trait];
@@ -4274,12 +4308,31 @@ const kMultiplicationInterval64BitsNormalCases = {
     { input: [0.1, -0.1], expected: [reinterpretU16AsF16(0xa120), reinterpretU16AsF16(0xa11e)] },  // ~-0.01
     { input: [-0.1, 0.1], expected: [reinterpretU16AsF16(0xa120), reinterpretU16AsF16(0xa11e)] },  // ~-0.01
   ] as ScalarPairToIntervalCase[],
+  abstract: [
+    // 0.1 isn't exactly representable in f64, but will be quantized to an
+    // exact value when storing to a 'number' (0x3FB999999999999A).
+    // This is why below the expectations are not intervals.
+    // Finite values multiply zero result in zero
+    { input: [0.1, 0], expected: 0 },
+    { input: [0, 0.1], expected: 0 },
+    { input: [-0.1, 0], expected: 0 },
+    { input: [0, -0.1], expected: 0 },
+    { input: [0.1, 1], expected: 0.1 },
+    { input: [-1, -0.1], expected: 0.1 },
+    { input: [-0.1, 1], expected: -0.1 },
+    { input: [-1, 0.1], expected: -0.1 },
+    // f64 0.1 * 0.1 = 0x3f847ae147ae147c,
+    { input: [0.1, 0.1], expected: reinterpretU64AsF64(0x3f847ae147ae147cn) },  // ~0.01
+    { input: [-0.1, -0.1], expected: reinterpretU64AsF64(0x3f847ae147ae147cn) },  // ~0.01
+    { input: [0.1, -0.1], expected: reinterpretU64AsF64(0xbf847ae147ae147cn) },  // ~-0.01
+    { input: [-0.1, 0.1], expected: reinterpretU64AsF64(0xbf847ae147ae147cn) },  // ~-0.01
+  ] as ScalarPairToIntervalCase[],
 } as const;
 
 g.test('multiplicationInterval')
   .params(u =>
     u
-      .combine('trait', ['f32', 'f16'] as const)
+      .combine('trait', ['f32', 'f16', 'abstract'] as const)
       .beginSubcases()
       .expandWithParams<ScalarPairToIntervalCase>(p => {
         const trait = FP[p.trait];
@@ -4539,12 +4592,28 @@ const kSubtractionInterval64BitsNormalCases = {
     // Expect f16 interval [0xAE67-0x2E67, 0xAE66-0x2E66]
     { input: [-0.1, 0.1], expected: [reinterpretU16AsF16(0xae67)-reinterpretU16AsF16(0x2e67), reinterpretU16AsF16(0xae66)-reinterpretU16AsF16(0x2e66)] },
   ] as ScalarPairToIntervalCase[],
+  abstract: [
+    // 0.1 isn't exactly representable in f64, but will be quantized to an
+    // exact value when storing to a 'number' (0x3FB999999999999A).
+    // This is why below the expectations are not intervals.
+    { input: [0.1, 0], expected: 0.1 },
+    { input: [0, -0.1], expected: 0.1 },
+    { input: [-0.1, 0], expected: -0.1 },
+    { input: [0, 0.1], expected: -0.1 },
+
+    { input: [0.1, 0.1], expected: 0 },
+    { input: [-0.1, -0.1], expected: 0 },
+    // f64 0x3FB999999999999A - 0xBFB999999999999A = 0x3FC999999999999A
+    { input: [0.1, -0.1], expected: reinterpretU64AsF64(0x3fc999999999999an) },  // ~0.2
+    // f64 0xBFB999999999999A - 0x3FB999999999999A = 0xBFC999999999999A
+    { input: [-0.1, 0.1], expected: reinterpretU64AsF64(0xbfc999999999999an) },  // ~-0.2,
+  ] as ScalarPairToIntervalCase[],
 } as const;
 
 g.test('subtractionInterval')
   .params(u =>
     u
-      .combine('trait', ['f32', 'f16'] as const)
+      .combine('trait', ['f32', 'f16', 'abstract'] as const)
       .beginSubcases()
       .expandWithParams<ScalarPairToIntervalCase>(p => {
         const trait = FP[p.trait];
@@ -5805,385 +5874,399 @@ interface MatrixPairToMatrixCase {
   expected: (number | IntervalBounds)[][];
 }
 
-g.test('additionMatrixMatrixInterval_f32')
-  .paramsSubcasesOnly<MatrixPairToMatrixCase>([
-    // Only testing that different shapes of matrices are handled correctly
-    // here, to reduce test duplication.
-    // additionMatrixMatrixInterval uses AdditionIntervalOp for calculating intervals,
-    // so the testing for additionInterval covers the actual interval
-    // calculations.
-    {
-      input: [
-        [
-          [1, 2],
-          [3, 4],
-        ],
-        [
-          [10, 20],
-          [30, 40],
-        ],
-      ],
-      expected: [
-        [11, 22],
-        [33, 44],
-      ],
-    },
-    {
-      input: [
-        [
-          [1, 2],
-          [3, 4],
-          [5, 6],
-        ],
-        [
-          [10, 20],
-          [30, 40],
-          [50, 60],
-        ],
-      ],
-      expected: [
-        [11, 22],
-        [33, 44],
-        [55, 66],
-      ],
-    },
-    {
-      input: [
-        [
-          [1, 2],
-          [3, 4],
-          [5, 6],
-          [7, 8],
-        ],
-        [
-          [10, 20],
-          [30, 40],
-          [50, 60],
-          [70, 80],
-        ],
-      ],
-      expected: [
-        [11, 22],
-        [33, 44],
-        [55, 66],
-        [77, 88],
-      ],
-    },
-    {
-      input: [
-        [
-          [1, 2, 3],
-          [4, 5, 6],
-        ],
-        [
-          [10, 20, 30],
-          [40, 50, 60],
-        ],
-      ],
-      expected: [
-        [11, 22, 33],
-        [44, 55, 66],
-      ],
-    },
-    {
-      input: [
-        [
-          [1, 2, 3],
-          [4, 5, 6],
-          [7, 8, 9],
-        ],
-        [
-          [10, 20, 30],
-          [40, 50, 60],
-          [70, 80, 90],
-        ],
-      ],
-      expected: [
-        [11, 22, 33],
-        [44, 55, 66],
-        [77, 88, 99],
-      ],
-    },
-    {
-      input: [
-        [
-          [1, 2, 3],
-          [4, 5, 6],
-          [7, 8, 9],
-          [10, 11, 12],
-        ],
-        [
-          [10, 20, 30],
-          [40, 50, 60],
-          [70, 80, 90],
-          [1000, 1100, 1200],
-        ],
-      ],
-      expected: [
-        [11, 22, 33],
-        [44, 55, 66],
-        [77, 88, 99],
-        [1010, 1111, 1212],
-      ],
-    },
-    {
-      input: [
-        [
-          [1, 2, 3, 4],
-          [5, 6, 7, 8],
-        ],
-        [
-          [10, 20, 30, 40],
-          [50, 60, 70, 80],
-        ],
-      ],
-      expected: [
-        [11, 22, 33, 44],
-        [55, 66, 77, 88],
-      ],
-    },
-    {
-      input: [
-        [
-          [1, 2, 3, 4],
-          [5, 6, 7, 8],
-          [9, 10, 11, 12],
-        ],
-        [
-          [10, 20, 30, 40],
-          [50, 60, 70, 80],
-          [90, 1000, 1100, 1200],
-        ],
-      ],
-      expected: [
-        [11, 22, 33, 44],
-        [55, 66, 77, 88],
-        [99, 1010, 1111, 1212],
-      ],
-    },
-    {
-      input: [
-        [
-          [1, 2, 3, 4],
-          [5, 6, 7, 8],
-          [9, 10, 11, 12],
-          [13, 14, 15, 16],
-        ],
-        [
-          [10, 20, 30, 40],
-          [50, 60, 70, 80],
-          [90, 1000, 1100, 1200],
-          [1300, 1400, 1500, 1600],
-        ],
-      ],
-      expected: [
-        [11, 22, 33, 44],
-        [55, 66, 77, 88],
-        [99, 1010, 1111, 1212],
-        [1313, 1414, 1515, 1616],
-      ],
-    },
-  ])
+g.test('additionMatrixMatrixInterval')
+  .params(u =>
+    u
+      .combine('trait', ['f32', 'abstract'] as const)
+      .beginSubcases()
+      .expandWithParams<MatrixPairToMatrixCase>(_ => {
+        // Only testing that different shapes of matrices are handled correctly
+        // here, to reduce test duplication.
+        // additionMatrixMatrixInterval uses AdditionIntervalOp for calculating intervals,
+        // so the testing for additionInterval covers the actual interval
+        // calculations.
+        return [
+          {
+            input: [
+              [
+                [1, 2],
+                [3, 4],
+              ],
+              [
+                [10, 20],
+                [30, 40],
+              ],
+            ],
+            expected: [
+              [11, 22],
+              [33, 44],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2],
+                [3, 4],
+                [5, 6],
+              ],
+              [
+                [10, 20],
+                [30, 40],
+                [50, 60],
+              ],
+            ],
+            expected: [
+              [11, 22],
+              [33, 44],
+              [55, 66],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2],
+                [3, 4],
+                [5, 6],
+                [7, 8],
+              ],
+              [
+                [10, 20],
+                [30, 40],
+                [50, 60],
+                [70, 80],
+              ],
+            ],
+            expected: [
+              [11, 22],
+              [33, 44],
+              [55, 66],
+              [77, 88],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3],
+                [4, 5, 6],
+              ],
+              [
+                [10, 20, 30],
+                [40, 50, 60],
+              ],
+            ],
+            expected: [
+              [11, 22, 33],
+              [44, 55, 66],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9],
+              ],
+              [
+                [10, 20, 30],
+                [40, 50, 60],
+                [70, 80, 90],
+              ],
+            ],
+            expected: [
+              [11, 22, 33],
+              [44, 55, 66],
+              [77, 88, 99],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9],
+                [10, 11, 12],
+              ],
+              [
+                [10, 20, 30],
+                [40, 50, 60],
+                [70, 80, 90],
+                [1000, 1100, 1200],
+              ],
+            ],
+            expected: [
+              [11, 22, 33],
+              [44, 55, 66],
+              [77, 88, 99],
+              [1010, 1111, 1212],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+              ],
+              [
+                [10, 20, 30, 40],
+                [50, 60, 70, 80],
+              ],
+            ],
+            expected: [
+              [11, 22, 33, 44],
+              [55, 66, 77, 88],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+              ],
+              [
+                [10, 20, 30, 40],
+                [50, 60, 70, 80],
+                [90, 1000, 1100, 1200],
+              ],
+            ],
+            expected: [
+              [11, 22, 33, 44],
+              [55, 66, 77, 88],
+              [99, 1010, 1111, 1212],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+              ],
+              [
+                [10, 20, 30, 40],
+                [50, 60, 70, 80],
+                [90, 1000, 1100, 1200],
+                [1300, 1400, 1500, 1600],
+              ],
+            ],
+            expected: [
+              [11, 22, 33, 44],
+              [55, 66, 77, 88],
+              [99, 1010, 1111, 1212],
+              [1313, 1414, 1515, 1616],
+            ],
+          },
+        ];
+      })
+  )
   .fn(t => {
-    const x = t.params.input[0];
-    const y = t.params.input[1];
-    const expected = FP.f32.toMatrix(t.params.expected);
-    const got = FP.f32.additionMatrixMatrixInterval(x, y);
+    const [x, y] = t.params.input;
+    const trait = FP[t.params.trait];
+    const expected = trait.toMatrix(t.params.expected);
+    const got = trait.additionMatrixMatrixInterval(x, y);
     t.expect(
       objectEquals(expected, got),
-      `f32.additionMatrixMatrixInterval([${JSON.stringify(x)}], [${JSON.stringify(
+      `${t.params.trait}.additionMatrixMatrixInterval([${JSON.stringify(x)}], [${JSON.stringify(
         y
       )}]) returned '[${JSON.stringify(got)}]'. Expected '[${JSON.stringify(expected)}]'`
     );
   });
 
-g.test('subtractionMatrixMatrixInterval_f32')
-  .paramsSubcasesOnly<MatrixPairToMatrixCase>([
-    // Only testing that different shapes of matrices are handled correctly
-    // here, to reduce test duplication.
-    // subtractionMatrixMatrixInterval uses SubtractionIntervalOp for calculating intervals,
-    // so the testing for subtractionInterval covers the actual interval
-    // calculations.
-    {
-      input: [
-        [
-          [-1, -2],
-          [-3, -4],
-        ],
-        [
-          [10, 20],
-          [30, 40],
-        ],
-      ],
-      expected: [
-        [-11, -22],
-        [-33, -44],
-      ],
-    },
-    {
-      input: [
-        [
-          [-1, -2],
-          [-3, -4],
-          [-5, -6],
-        ],
-        [
-          [10, 20],
-          [30, 40],
-          [50, 60],
-        ],
-      ],
-      expected: [
-        [-11, -22],
-        [-33, -44],
-        [-55, -66],
-      ],
-    },
-    {
-      input: [
-        [
-          [-1, -2],
-          [-3, -4],
-          [-5, -6],
-          [-7, -8],
-        ],
-        [
-          [10, 20],
-          [30, 40],
-          [50, 60],
-          [70, 80],
-        ],
-      ],
-      expected: [
-        [-11, -22],
-        [-33, -44],
-        [-55, -66],
-        [-77, -88],
-      ],
-    },
-    {
-      input: [
-        [
-          [-1, -2, -3],
-          [-4, -5, -6],
-        ],
-        [
-          [10, 20, 30],
-          [40, 50, 60],
-        ],
-      ],
-      expected: [
-        [-11, -22, -33],
-        [-44, -55, -66],
-      ],
-    },
-    {
-      input: [
-        [
-          [-1, -2, -3],
-          [-4, -5, -6],
-          [-7, -8, -9],
-        ],
-        [
-          [10, 20, 30],
-          [40, 50, 60],
-          [70, 80, 90],
-        ],
-      ],
-      expected: [
-        [-11, -22, -33],
-        [-44, -55, -66],
-        [-77, -88, -99],
-      ],
-    },
-    {
-      input: [
-        [
-          [-1, -2, -3],
-          [-4, -5, -6],
-          [-7, -8, -9],
-          [-10, -11, -12],
-        ],
-        [
-          [10, 20, 30],
-          [40, 50, 60],
-          [70, 80, 90],
-          [1000, 1100, 1200],
-        ],
-      ],
-      expected: [
-        [-11, -22, -33],
-        [-44, -55, -66],
-        [-77, -88, -99],
-        [-1010, -1111, -1212],
-      ],
-    },
-    {
-      input: [
-        [
-          [-1, -2, -3, -4],
-          [-5, -6, -7, -8],
-        ],
-        [
-          [10, 20, 30, 40],
-          [50, 60, 70, 80],
-        ],
-      ],
-      expected: [
-        [-11, -22, -33, -44],
-        [-55, -66, -77, -88],
-      ],
-    },
-    {
-      input: [
-        [
-          [-1, -2, -3, -4],
-          [-5, -6, -7, -8],
-          [-9, -10, -11, -12],
-        ],
-        [
-          [10, 20, 30, 40],
-          [50, 60, 70, 80],
-          [90, 1000, 1100, 1200],
-        ],
-      ],
-      expected: [
-        [-11, -22, -33, -44],
-        [-55, -66, -77, -88],
-        [-99, -1010, -1111, -1212],
-      ],
-    },
-    {
-      input: [
-        [
-          [-1, -2, -3, -4],
-          [-5, -6, -7, -8],
-          [-9, -10, -11, -12],
-          [-13, -14, -15, -16],
-        ],
-        [
-          [10, 20, 30, 40],
-          [50, 60, 70, 80],
-          [90, 1000, 1100, 1200],
-          [1300, 1400, 1500, 1600],
-        ],
-      ],
-      expected: [
-        [-11, -22, -33, -44],
-        [-55, -66, -77, -88],
-        [-99, -1010, -1111, -1212],
-        [-1313, -1414, -1515, -1616],
-      ],
-    },
-  ])
+g.test('subtractionMatrixMatrixInterval')
+  .params(u =>
+    u
+      .combine('trait', ['f32', 'abstract'] as const)
+      .beginSubcases()
+      .expandWithParams<MatrixPairToMatrixCase>(_ => {
+        // Only testing that different shapes of matrices are handled correctly
+        // here, to reduce test duplication.
+        // subtractionMatrixMatrixInterval uses AdditionIntervalOp for calculating intervals,
+        // so the testing for subtractionInterval covers the actual interval
+        // calculations.
+        return [
+          {
+            input: [
+              [
+                [1, 2],
+                [3, 4],
+              ],
+              [
+                [-10, -20],
+                [-30, -40],
+              ],
+            ],
+            expected: [
+              [11, 22],
+              [33, 44],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2],
+                [3, 4],
+                [5, 6],
+              ],
+              [
+                [-10, -20],
+                [-30, -40],
+                [-50, -60],
+              ],
+            ],
+            expected: [
+              [11, 22],
+              [33, 44],
+              [55, 66],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2],
+                [3, 4],
+                [5, 6],
+                [7, 8],
+              ],
+              [
+                [-10, -20],
+                [-30, -40],
+                [-50, -60],
+                [-70, -80],
+              ],
+            ],
+            expected: [
+              [11, 22],
+              [33, 44],
+              [55, 66],
+              [77, 88],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3],
+                [4, 5, 6],
+              ],
+              [
+                [-10, -20, -30],
+                [-40, -50, -60],
+              ],
+            ],
+            expected: [
+              [11, 22, 33],
+              [44, 55, 66],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9],
+              ],
+              [
+                [-10, -20, -30],
+                [-40, -50, -60],
+                [-70, -80, -90],
+              ],
+            ],
+            expected: [
+              [11, 22, 33],
+              [44, 55, 66],
+              [77, 88, 99],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9],
+                [10, 11, 12],
+              ],
+              [
+                [-10, -20, -30],
+                [-40, -50, -60],
+                [-70, -80, -90],
+                [-1000, -1100, -1200],
+              ],
+            ],
+            expected: [
+              [11, 22, 33],
+              [44, 55, 66],
+              [77, 88, 99],
+              [1010, 1111, 1212],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+              ],
+              [
+                [-10, -20, -30, -40],
+                [-50, -60, -70, -80],
+              ],
+            ],
+            expected: [
+              [11, 22, 33, 44],
+              [55, 66, 77, 88],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+              ],
+              [
+                [-10, -20, -30, -40],
+                [-50, -60, -70, -80],
+                [-90, -1000, -1100, -1200],
+              ],
+            ],
+            expected: [
+              [11, 22, 33, 44],
+              [55, 66, 77, 88],
+              [99, 1010, 1111, 1212],
+            ],
+          },
+          {
+            input: [
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+              ],
+              [
+                [-10, -20, -30, -40],
+                [-50, -60, -70, -80],
+                [-90, -1000, -1100, -1200],
+                [-1300, -1400, -1500, -1600],
+              ],
+            ],
+            expected: [
+              [11, 22, 33, 44],
+              [55, 66, 77, 88],
+              [99, 1010, 1111, 1212],
+              [1313, 1414, 1515, 1616],
+            ],
+          },
+        ];
+      })
+  )
   .fn(t => {
-    const x = t.params.input[0];
-    const y = t.params.input[1];
-    const expected = FP.f32.toMatrix(t.params.expected);
-    const got = FP.f32.subtractionMatrixMatrixInterval(x, y);
+    const [x, y] = t.params.input;
+    const trait = FP[t.params.trait];
+    const expected = trait.toMatrix(t.params.expected);
+    const got = trait.subtractionMatrixMatrixInterval(x, y);
     t.expect(
       objectEquals(expected, got),
-      `f32.subtractionMatrixMatrixInterval([${JSON.stringify(x)}], [${JSON.stringify(
+      `${t.params.trait}.subtractionMatrixMatrixInterval([${JSON.stringify(x)}], [${JSON.stringify(
         y
       )}]) returned '[${JSON.stringify(got)}]'. Expected '[${JSON.stringify(expected)}]'`
     );
