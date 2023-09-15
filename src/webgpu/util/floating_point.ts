@@ -4890,7 +4890,7 @@ class FPAbstractTraits extends FPTraits {
   public readonly normalizeInterval = this.unimplementedVectorToVector.bind(this);
   public readonly powInterval = this.unimplementedScalarPairToInterval.bind(this);
   public readonly quantizeToF16Interval = this.unimplementedScalarToInterval.bind(this);
-  public readonly radiansInterval = this.unimplementedScalarToInterval.bind(this);
+  public readonly radiansInterval = this.radiansIntervalImpl.bind(this);
   public readonly reflectInterval = this.unimplementedVectorPairToVector.bind(this);
   public readonly refractInterval = this.unimplementedRefract.bind(this);
   public readonly remainderInterval = this.unimplementedScalarPairToInterval.bind(this);
@@ -4908,7 +4908,7 @@ class FPAbstractTraits extends FPTraits {
   );
   public readonly tanInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly tanhInterval = this.unimplementedScalarToInterval.bind(this);
-  public readonly transposeInterval = this.unimplementedMatrixToMatrix.bind(this);
+  public readonly transposeInterval = this.transposeIntervalImpl.bind(this);
   public readonly truncInterval = this.truncIntervalImpl.bind(this);
 }
 
@@ -5122,7 +5122,7 @@ class F16Traits extends FPTraits {
   public readonly acoshPrimaryInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly acoshIntervals = [this.acoshAlternativeInterval, this.acoshPrimaryInterval];
   public readonly additionInterval = this.additionIntervalImpl.bind(this);
-  public readonly additionMatrixMatrixInterval = this.unimplementedMatrixPairToMatrix.bind(this);
+  public readonly additionMatrixMatrixInterval = this.additionMatrixMatrixIntervalImpl.bind(this);
   public readonly asinInterval = this.asinIntervalImpl.bind(this);
   public readonly asinhInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly atanInterval = this.atanIntervalImpl.bind(this);
@@ -5135,11 +5135,11 @@ class F16Traits extends FPTraits {
   public readonly cosInterval = this.cosIntervalImpl.bind(this);
   public readonly coshInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly crossInterval = this.unimplementedVectorPairToVector.bind(this);
-  public readonly degreesInterval = this.unimplementedScalarToInterval.bind(this);
+  public readonly degreesInterval = this.degreesIntervalImpl.bind(this);
   public readonly determinantInterval = this.unimplementedMatrixToInterval.bind(this);
   public readonly distanceInterval = this.unimplementedDistance.bind(this);
   public readonly divisionInterval = this.divisionIntervalImpl.bind(this);
-  public readonly dotInterval = this.unimplementedVectorPairToInterval.bind(this);
+  public readonly dotInterval = this.dotIntervalImpl.bind(this);
   public readonly expInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly exp2Interval = this.unimplementedScalarToInterval.bind(this);
   public readonly faceForwardIntervals = this.unimplementedFaceForward.bind(this);
@@ -5158,29 +5158,29 @@ class F16Traits extends FPTraits {
   public readonly mixIntervals = [this.mixImpreciseInterval, this.mixPreciseInterval];
   public readonly modfInterval = this.unimplementedModf.bind(this);
   public readonly multiplicationInterval = this.multiplicationIntervalImpl.bind(this);
-  public readonly multiplicationMatrixMatrixInterval = this.unimplementedMatrixPairToMatrix.bind(
+  public readonly multiplicationMatrixMatrixInterval = this.multiplicationMatrixMatrixIntervalImpl.bind(
     this
   );
-  public readonly multiplicationMatrixScalarInterval = this.unimplementedMatrixScalarToMatrix.bind(
+  public readonly multiplicationMatrixScalarInterval = this.multiplicationMatrixScalarIntervalImpl.bind(
     this
   );
-  public readonly multiplicationScalarMatrixInterval = this.unimplementedScalarMatrixToMatrix.bind(
+  public readonly multiplicationScalarMatrixInterval = this.multiplicationScalarMatrixIntervalImpl.bind(
     this
   );
-  public readonly multiplicationMatrixVectorInterval = this.unimplementedMatrixVectorToVector.bind(
+  public readonly multiplicationMatrixVectorInterval = this.multiplicationMatrixVectorIntervalImpl.bind(
     this
   );
-  public readonly multiplicationVectorMatrixInterval = this.unimplementedVectorMatrixToVector.bind(
+  public readonly multiplicationVectorMatrixInterval = this.multiplicationVectorMatrixIntervalImpl.bind(
     this
   );
   public readonly negationInterval = this.negationIntervalImpl.bind(this);
   public readonly normalizeInterval = this.unimplementedVectorToVector.bind(this);
   public readonly powInterval = this.unimplementedScalarPairToInterval.bind(this);
   public readonly quantizeToF16Interval = this.quantizeToF16IntervalNotAvailable.bind(this);
-  public readonly radiansInterval = this.unimplementedScalarToInterval.bind(this);
+  public readonly radiansInterval = this.radiansIntervalImpl.bind(this);
   public readonly reflectInterval = this.unimplementedVectorPairToVector.bind(this);
   public readonly refractInterval = this.unimplementedRefract.bind(this);
-  public readonly remainderInterval = this.unimplementedScalarPairToInterval.bind(this);
+  public readonly remainderInterval = this.remainderIntervalImpl.bind(this);
   public readonly roundInterval = this.roundIntervalImpl.bind(this);
   public readonly saturateInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly signInterval = this.signIntervalImpl.bind(this);
@@ -5190,7 +5190,9 @@ class F16Traits extends FPTraits {
   public readonly sqrtInterval = this.sqrtIntervalImpl.bind(this);
   public readonly stepInterval = this.stepIntervalImpl.bind(this);
   public readonly subtractionInterval = this.subtractionIntervalImpl.bind(this);
-  public readonly subtractionMatrixMatrixInterval = this.unimplementedMatrixPairToMatrix.bind(this);
+  public readonly subtractionMatrixMatrixInterval = this.subtractionMatrixMatrixIntervalImpl.bind(
+    this
+  );
   public readonly tanInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly tanhInterval = this.unimplementedScalarToInterval.bind(this);
   public readonly transposeInterval = this.transposeIntervalImpl.bind(this);

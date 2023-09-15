@@ -2689,35 +2689,64 @@ fn((t) => {
 
 });
 
-g.test('degreesInterval_f32').
-paramsSubcasesOnly(
 
-[
-{ input: kValue.f32.infinity.negative, expected: kUnboundedBounds },
-{ input: kValue.f32.negative.min, expected: kUnboundedBounds },
-{ input: kValue.f32.negative.pi.whole, expected: [kMinusOneULPFunctions['f32'](-180), kPlusOneULPFunctions['f32'](-180)] },
-{ input: kValue.f32.negative.pi.three_quarters, expected: [kMinusOneULPFunctions['f32'](-135), kPlusOneULPFunctions['f32'](-135)] },
-{ input: kValue.f32.negative.pi.half, expected: [kMinusOneULPFunctions['f32'](-90), kPlusOneULPFunctions['f32'](-90)] },
-{ input: kValue.f32.negative.pi.third, expected: [kMinusOneULPFunctions['f32'](-60), kPlusOneULPFunctions['f32'](-60)] },
-{ input: kValue.f32.negative.pi.quarter, expected: [kMinusOneULPFunctions['f32'](-45), kPlusOneULPFunctions['f32'](-45)] },
-{ input: kValue.f32.negative.pi.sixth, expected: [kMinusOneULPFunctions['f32'](-30), kPlusOneULPFunctions['f32'](-30)] },
-{ input: 0, expected: 0 },
-{ input: kValue.f32.positive.pi.sixth, expected: [kMinusOneULPFunctions['f32'](30), kPlusOneULPFunctions['f32'](30)] },
-{ input: kValue.f32.positive.pi.quarter, expected: [kMinusOneULPFunctions['f32'](45), kPlusOneULPFunctions['f32'](45)] },
-{ input: kValue.f32.positive.pi.third, expected: [kMinusOneULPFunctions['f32'](60), kPlusOneULPFunctions['f32'](60)] },
-{ input: kValue.f32.positive.pi.half, expected: [kMinusOneULPFunctions['f32'](90), kPlusOneULPFunctions['f32'](90)] },
-{ input: kValue.f32.positive.pi.three_quarters, expected: [kMinusOneULPFunctions['f32'](135), kPlusOneULPFunctions['f32'](135)] },
-{ input: kValue.f32.positive.pi.whole, expected: [kMinusOneULPFunctions['f32'](180), kPlusOneULPFunctions['f32'](180)] },
-{ input: kValue.f32.positive.max, expected: kUnboundedBounds },
-{ input: kValue.f32.infinity.positive, expected: kUnboundedBounds }]).
+const kDegreesIntervalCases = {
+  f32: [
+  { input: kValue.f32.negative.pi.whole, expected: [kMinusOneULPFunctions['f32'](-180), kPlusOneULPFunctions['f32'](-180)] },
+  { input: kValue.f32.negative.pi.three_quarters, expected: [kMinusOneULPFunctions['f32'](-135), kPlusOneULPFunctions['f32'](-135)] },
+  { input: kValue.f32.negative.pi.half, expected: [kMinusOneULPFunctions['f32'](-90), kPlusOneULPFunctions['f32'](-90)] },
+  { input: kValue.f32.negative.pi.third, expected: [kMinusOneULPFunctions['f32'](-60), kPlusOneULPFunctions['f32'](-60)] },
+  { input: kValue.f32.negative.pi.quarter, expected: [kMinusOneULPFunctions['f32'](-45), kPlusOneULPFunctions['f32'](-45)] },
+  { input: kValue.f32.negative.pi.sixth, expected: [kMinusOneULPFunctions['f32'](-30), kPlusOneULPFunctions['f32'](-30)] },
+  { input: kValue.f32.positive.pi.sixth, expected: [kMinusOneULPFunctions['f32'](30), kPlusOneULPFunctions['f32'](30)] },
+  { input: kValue.f32.positive.pi.quarter, expected: [kMinusOneULPFunctions['f32'](45), kPlusOneULPFunctions['f32'](45)] },
+  { input: kValue.f32.positive.pi.third, expected: [kMinusOneULPFunctions['f32'](60), kPlusOneULPFunctions['f32'](60)] },
+  { input: kValue.f32.positive.pi.half, expected: [kMinusOneULPFunctions['f32'](90), kPlusOneULPFunctions['f32'](90)] },
+  { input: kValue.f32.positive.pi.three_quarters, expected: [kMinusOneULPFunctions['f32'](135), kPlusOneULPFunctions['f32'](135)] },
+  { input: kValue.f32.positive.pi.whole, expected: [kMinusOneULPFunctions['f32'](180), kPlusOneULPFunctions['f32'](180)] }],
 
+  f16: [
+  { input: kValue.f16.negative.pi.whole, expected: [-180, kPlusOneULPFunctions['f16'](-180)] },
+  { input: kValue.f16.negative.pi.three_quarters, expected: [-135, kPlusOneULPFunctions['f16'](-135)] },
+  { input: kValue.f16.negative.pi.half, expected: [-90, kPlusOneULPFunctions['f16'](-90)] },
+  { input: kValue.f16.negative.pi.third, expected: [-60, kPlusNULPFunctions['f16'](-60, 2)] },
+  { input: kValue.f16.negative.pi.quarter, expected: [-45, kPlusOneULPFunctions['f16'](-45)] },
+  { input: kValue.f16.negative.pi.sixth, expected: [-30, kPlusNULPFunctions['f16'](-30, 2)] },
+  { input: kValue.f16.positive.pi.sixth, expected: [kMinusNULPFunctions['f16'](30, 2), 30] },
+  { input: kValue.f16.positive.pi.quarter, expected: [kMinusOneULPFunctions['f16'](45), 45] },
+  { input: kValue.f16.positive.pi.third, expected: [kMinusNULPFunctions['f16'](60, 2), 60] },
+  { input: kValue.f16.positive.pi.half, expected: [kMinusOneULPFunctions['f16'](90), 90] },
+  { input: kValue.f16.positive.pi.three_quarters, expected: [kMinusOneULPFunctions['f16'](135), 135] },
+  { input: kValue.f16.positive.pi.whole, expected: [kMinusOneULPFunctions['f16'](180), 180] }]
+
+};
+
+g.test('degreesInterval').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+expandWithParams((p) => {
+  const trait = p.trait;
+  const constants = FP[trait].constants();
+
+  return [
+  { input: constants.positive.infinity, expected: kUnboundedBounds },
+  { input: constants.negative.min, expected: kUnboundedBounds },
+  { input: 0, expected: 0 },
+  { input: constants.positive.max, expected: kUnboundedBounds },
+  { input: constants.negative.infinity, expected: kUnboundedBounds },
+  ...kDegreesIntervalCases[trait]];
+
+})).
 
 fn((t) => {
-  const expected = FP.f32.toInterval(t.params.expected);
-  const got = FP.f32.degreesInterval(t.params.input);
+  const trait = FP[t.params.trait];
+  const expected = trait.toInterval(t.params.expected);
+  const got = trait.degreesInterval(t.params.input);
   t.expect(
   objectEquals(expected, got),
-  `f32.degreesInterval(${t.params.input}) returned ${got}. Expected ${expected}`);
+  `${t.params.trait}.degreesInterval(${t.params.input}) returned ${got}. Expected ${expected}`);
 
 });
 
@@ -3212,33 +3241,76 @@ fn((t) => {
 
 });
 
-g.test('radiansInterval_f32').
-paramsSubcasesOnly(
 
-[
-{ input: kValue.f32.infinity.negative, expected: kUnboundedBounds },
-{ input: -180, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.whole), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.whole)] },
-{ input: -135, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.three_quarters), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.three_quarters)] },
-{ input: -90, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.half), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.half)] },
-{ input: -60, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.third), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.third)] },
-{ input: -45, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.quarter), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.quarter)] },
-{ input: -30, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.sixth), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.sixth)] },
-{ input: 0, expected: 0 },
-{ input: 30, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.sixth), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.sixth)] },
-{ input: 45, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.quarter), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.quarter)] },
-{ input: 60, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.third), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.third)] },
-{ input: 90, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.half), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.half)] },
-{ input: 135, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.three_quarters), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.three_quarters)] },
-{ input: 180, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.whole), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.whole)] },
-{ input: kValue.f32.infinity.positive, expected: kUnboundedBounds }]).
+const kRadiansIntervalCases = {
+  f32: [
+  { input: -180, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.whole), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.whole)] },
+  { input: -135, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.three_quarters), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.three_quarters)] },
+  { input: -90, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.half), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.half)] },
+  { input: -60, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.third), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.third)] },
+  { input: -45, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.quarter), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.quarter)] },
+  { input: -30, expected: [kMinusOneULPFunctions['f32'](kValue.f32.negative.pi.sixth), kPlusOneULPFunctions['f32'](kValue.f32.negative.pi.sixth)] },
+  { input: 30, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.sixth), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.sixth)] },
+  { input: 45, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.quarter), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.quarter)] },
+  { input: 60, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.third), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.third)] },
+  { input: 90, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.half), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.half)] },
+  { input: 135, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.three_quarters), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.three_quarters)] },
+  { input: 180, expected: [kMinusOneULPFunctions['f32'](kValue.f32.positive.pi.whole), kPlusOneULPFunctions['f32'](kValue.f32.positive.pi.whole)] }],
 
+  f16: [
+  { input: -180, expected: [kMinusOneULPFunctions['f16'](kValue.f16.negative.pi.whole), kPlusOneULPFunctions['f16'](kValue.f16.negative.pi.whole)] },
+  { input: -135, expected: [kMinusOneULPFunctions['f16'](kValue.f16.negative.pi.three_quarters), kPlusOneULPFunctions['f16'](kValue.f16.negative.pi.three_quarters)] },
+  { input: -90, expected: [kMinusOneULPFunctions['f16'](kValue.f16.negative.pi.half), kPlusOneULPFunctions['f16'](kValue.f16.negative.pi.half)] },
+  { input: -60, expected: [kMinusOneULPFunctions['f16'](kValue.f16.negative.pi.third), kPlusOneULPFunctions['f16'](kValue.f16.negative.pi.third)] },
+  { input: -45, expected: [kMinusOneULPFunctions['f16'](kValue.f16.negative.pi.quarter), kPlusOneULPFunctions['f16'](kValue.f16.negative.pi.quarter)] },
+  { input: -30, expected: [kMinusOneULPFunctions['f16'](kValue.f16.negative.pi.sixth), kPlusOneULPFunctions['f16'](kValue.f16.negative.pi.sixth)] },
+  { input: 30, expected: [kMinusOneULPFunctions['f16'](kValue.f16.positive.pi.sixth), kPlusOneULPFunctions['f16'](kValue.f16.positive.pi.sixth)] },
+  { input: 45, expected: [kMinusOneULPFunctions['f16'](kValue.f16.positive.pi.quarter), kPlusOneULPFunctions['f16'](kValue.f16.positive.pi.quarter)] },
+  { input: 60, expected: [kMinusOneULPFunctions['f16'](kValue.f16.positive.pi.third), kPlusOneULPFunctions['f16'](kValue.f16.positive.pi.third)] },
+  { input: 90, expected: [kMinusOneULPFunctions['f16'](kValue.f16.positive.pi.half), kPlusOneULPFunctions['f16'](kValue.f16.positive.pi.half)] },
+  { input: 135, expected: [kMinusOneULPFunctions['f16'](kValue.f16.positive.pi.three_quarters), kPlusOneULPFunctions['f16'](kValue.f16.positive.pi.three_quarters)] },
+  { input: 180, expected: [kMinusOneULPFunctions['f16'](kValue.f16.positive.pi.whole), kPlusOneULPFunctions['f16'](kValue.f16.positive.pi.whole)] }],
+
+  abstract: [
+  { input: -180, expected: kValue.f64.negative.pi.whole },
+  { input: -135, expected: kValue.f64.negative.pi.three_quarters },
+  { input: -90, expected: kValue.f64.negative.pi.half },
+  { input: -60, expected: kValue.f64.negative.pi.third },
+  { input: -45, expected: kValue.f64.negative.pi.quarter },
+  { input: -30, expected: kValue.f64.negative.pi.sixth },
+  { input: 30, expected: kValue.f64.positive.pi.sixth },
+  { input: 45, expected: kValue.f64.positive.pi.quarter },
+  { input: 60, expected: kValue.f64.positive.pi.third },
+  { input: 90, expected: kValue.f64.positive.pi.half },
+  { input: 135, expected: kValue.f64.positive.pi.three_quarters },
+  { input: 180, expected: kValue.f64.positive.pi.whole }]
+
+};
+
+g.test('radiansInterval').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16', 'abstract']).
+beginSubcases().
+expandWithParams((p) => {
+  const trait = p.trait;
+  const constants = FP[trait].constants();
+
+  return [
+  { input: constants.positive.infinity, expected: kUnboundedBounds },
+  { input: 0, expected: 0 },
+  { input: constants.negative.infinity, expected: kUnboundedBounds },
+  ...kRadiansIntervalCases[trait]];
+
+})).
 
 fn((t) => {
-  const expected = FP.f32.toInterval(t.params.expected);
-  const got = FP.f32.radiansInterval(t.params.input);
+  const trait = FP[t.params.trait];
+  const expected = trait.toInterval(t.params.expected);
+  const got = trait.radiansInterval(t.params.input);
   t.expect(
   objectEquals(expected, got),
-  `f32.radiansInterval(${t.params.input}) returned ${got}. Expected ${expected}`);
+  `${t.params.trait}.radiansInterval(${t.params.input}) returned ${got}. Expected ${expected}`);
 
 });
 
@@ -4434,53 +4506,74 @@ fn((t) => {
 
 });
 
-g.test('remainderInterval_f32').
-paramsSubcasesOnly(
 
-[
-// 32-bit normals
-{ input: [0, 1], expected: [0, 0] },
-{ input: [0, -1], expected: [0, 0] },
-{ input: [1, 1], expected: [0, 1] },
-{ input: [1, -1], expected: [0, 1] },
-{ input: [-1, 1], expected: [-1, 0] },
-{ input: [-1, -1], expected: [-1, 0] },
-{ input: [4, 2], expected: [0, 2] },
-{ input: [-4, 2], expected: [-2, 0] },
-{ input: [4, -2], expected: [0, 2] },
-{ input: [-4, -2], expected: [-2, 0] },
-{ input: [2, 4], expected: [2, 2] },
-{ input: [-2, 4], expected: [-2, -2] },
-{ input: [2, -4], expected: [2, 2] },
-{ input: [-2, -4], expected: [-2, -2] },
+const kRemainderCases = {
+  f32: [
+  { input: [1, 0.1], expected: [reinterpretU32AsF32(0xb4000000), reinterpretU32AsF32(0x3dccccd8)] }, // ~[0, 0.1]
+  { input: [-1, 0.1], expected: [reinterpretU32AsF32(0xbdccccd8), reinterpretU32AsF32(0x34000000)] }, // ~[-0.1, 0]
+  { input: [1, -0.1], expected: [reinterpretU32AsF32(0xb4000000), reinterpretU32AsF32(0x3dccccd8)] }, // ~[0, 0.1]
+  { input: [-1, -0.1], expected: [reinterpretU32AsF32(0xbdccccd8), reinterpretU32AsF32(0x34000000)] } // ~[-0.1, 0]
+  ],
+  f16: [
+  { input: [1, 0.1], expected: [reinterpretU16AsF16(0x9400), reinterpretU16AsF16(0x2e70)] }, // ~[0, 0.1]
+  { input: [-1, 0.1], expected: [reinterpretU16AsF16(0xae70), reinterpretU16AsF16(0x1400)] }, // ~[-0.1, 0]
+  { input: [1, -0.1], expected: [reinterpretU16AsF16(0x9400), reinterpretU16AsF16(0x2e70)] }, // ~[0, 0.1]
+  { input: [-1, -0.1], expected: [reinterpretU16AsF16(0xae70), reinterpretU16AsF16(0x1400)] } // ~[-0.1, 0]
+  ]
+};
 
-// 64-bit normals
-{ input: [0, 0.1], expected: [0, 0] },
-{ input: [0, -0.1], expected: [0, 0] },
-{ input: [1, 0.1], expected: [reinterpretU32AsF32(0xb4000000), reinterpretU32AsF32(0x3dccccd8)] }, // ~[0, 0.1]
-{ input: [-1, 0.1], expected: [reinterpretU32AsF32(0xbdccccd8), reinterpretU32AsF32(0x34000000)] }, // ~[-0.1, 0]
-{ input: [1, -0.1], expected: [reinterpretU32AsF32(0xb4000000), reinterpretU32AsF32(0x3dccccd8)] }, // ~[0, 0.1]
-{ input: [-1, -0.1], expected: [reinterpretU32AsF32(0xbdccccd8), reinterpretU32AsF32(0x34000000)] }, // ~[-0.1, 0]
+g.test('remainderInterval').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+expandWithParams((p) => {
+  const trait = FP[p.trait];
+  const constants = trait.constants();
 
-// Denominator out of range
-{ input: [1, kValue.f32.infinity.positive], expected: kUnboundedBounds },
-{ input: [1, kValue.f32.infinity.negative], expected: kUnboundedBounds },
-{ input: [kValue.f32.infinity.negative, kValue.f32.infinity.negative], expected: kUnboundedBounds },
-{ input: [kValue.f32.infinity.negative, kValue.f32.infinity.positive], expected: kUnboundedBounds },
-{ input: [kValue.f32.infinity.positive, kValue.f32.infinity.negative], expected: kUnboundedBounds },
-{ input: [1, kValue.f32.positive.max], expected: kUnboundedBounds },
-{ input: [1, kValue.f32.negative.min], expected: kUnboundedBounds },
-{ input: [1, 0], expected: kUnboundedBounds },
-{ input: [1, kValue.f32.subnormal.positive.max], expected: kUnboundedBounds }]).
+  return [
+  ...kRemainderCases[p.trait],
+  // Normals
+  { input: [0, 1], expected: 0 },
+  { input: [0, -1], expected: 0 },
+  { input: [1, 1], expected: [0, 1] },
+  { input: [1, -1], expected: [0, 1] },
+  { input: [-1, 1], expected: [-1, 0] },
+  { input: [-1, -1], expected: [-1, 0] },
+  { input: [4, 2], expected: [0, 2] },
+  { input: [-4, 2], expected: [-2, 0] },
+  { input: [4, -2], expected: [0, 2] },
+  { input: [-4, -2], expected: [-2, 0] },
+  { input: [2, 4], expected: [2, 2] },
+  { input: [-2, 4], expected: -2 },
+  { input: [2, -4], expected: 2 },
+  { input: [-2, -4], expected: [-2, -2] },
+  { input: [0, 0.1], expected: 0 },
+  { input: [0, -0.1], expected: 0 },
+  { input: [8.5, 2], expected: 0.5 },
+  { input: [1.125, 1], expected: 0.125 },
 
+  // Denominator out of range
+  { input: [1, constants.positive.infinity], expected: kUnboundedBounds },
+  { input: [1, constants.negative.infinity], expected: kUnboundedBounds },
+  { input: [constants.negative.infinity, constants.negative.infinity], expected: kUnboundedBounds },
+  { input: [constants.negative.infinity, constants.positive.infinity], expected: kUnboundedBounds },
+  { input: [constants.positive.infinity, constants.negative.infinity], expected: kUnboundedBounds },
+  { input: [1, constants.positive.max], expected: kUnboundedBounds },
+  { input: [1, constants.negative.min], expected: kUnboundedBounds },
+  { input: [1, 0], expected: kUnboundedBounds },
+  { input: [1, constants.positive.subnormal.max], expected: kUnboundedBounds }];
+
+})).
 
 fn((t) => {
+  const trait = FP[t.params.trait];
   const [x, y] = t.params.input;
-  const expected = FP.f32.toInterval(t.params.expected);
-  const got = FP.f32.remainderInterval(x, y);
+  const expected = trait.toInterval(t.params.expected);
+  const got = trait.remainderInterval(x, y);
   t.expect(
   objectEquals(expected, got),
-  `f32.remainderInterval(${x}, ${y}) returned ${got}. Expected ${expected}`);
+  `FP.${t.params.trait}.remainderInterval(${x}, ${y}) returned ${got}. Expected ${expected}`);
 
 });
 
@@ -5417,56 +5510,96 @@ fn((t) => {
 
 });
 
-g.test('dotInterval_f32').
-paramsSubcasesOnly(
 
-[
-// vec2
-{ input: [[1.0, 0.0], [1.0, 0.0]], expected: 1.0 },
-{ input: [[0.0, 1.0], [0.0, 1.0]], expected: 1.0 },
-{ input: [[1.0, 1.0], [1.0, 1.0]], expected: 2.0 },
-{ input: [[-1.0, -1.0], [-1.0, -1.0]], expected: 2.0 },
-{ input: [[-1.0, 1.0], [1.0, -1.0]], expected: -2.0 },
-{ input: [[0.1, 0.0], [1.0, 0.0]], expected: [reinterpretU64AsF64(0x3fb9_9999_8000_0000n), reinterpretU64AsF64(0x3fb9_9999_a000_0000n)] }, // ~0.1
+const kDotIntervalCases = {
+  f32: [
+  // vec2
+  { input: [[0.1, 0.0], [1.0, 0.0]], expected: [reinterpretU32AsF32(0x3dcccccc), reinterpretU32AsF32(0x3dcccccd)] }, // ~0.1
+  // vec3
+  { input: [[0.1, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: [reinterpretU32AsF32(0x3dcccccc), reinterpretU32AsF32(0x3dcccccd)] }, // ~0.1
+  // vec4
+  { input: [[0.1, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], expected: [reinterpretU32AsF32(0x3dcccccc), reinterpretU32AsF32(0x3dcccccd)] }, // ~0.1
+  // Inputs with large values but cancel out to finite result. In these cases, 2.0*2.0 = 4.0 and
+  // 3.0*3.0 = 9.0 is much smaller than kValue.f32.positive.max, as a result
+  // kValue.f32.positive.max + 9.0 = kValue.f32.positive.max in f32 and even f64. So, if the
+  // positive and negative large number cancel each other first, the result would be
+  // 2.0*2.0+3.0*3.0 = 13. Otherwise, the resule would be 0.0 or 4.0 or 9.0.
+  // https://github.com/gpuweb/cts/issues/2155
+  { input: [[kValue.f32.positive.max, 1.0, 2.0, 3.0], [-1.0, kValue.f32.positive.max, -2.0, -3.0]], expected: [-13, 0] },
+  { input: [[kValue.f32.positive.max, 1.0, 2.0, 3.0], [1.0, kValue.f32.negative.min, 2.0, 3.0]], expected: [0, 13] }],
 
-// vec3
-{ input: [[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: 1.0 },
-{ input: [[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]], expected: 1.0 },
-{ input: [[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]], expected: 1.0 },
-{ input: [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], expected: 3.0 },
-{ input: [[-1.0, -1.0, -1.0], [-1.0, -1.0, -1.0]], expected: 3.0 },
-{ input: [[1.0, -1.0, -1.0], [-1.0, 1.0, -1.0]], expected: -1.0 },
-{ input: [[0.1, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fb9_9999_8000_0000n), reinterpretU64AsF64(0x3fb9_9999_a000_0000n)] }, // ~0.1
+  f16: [
+  // vec2
+  { input: [[0.1, 0.0], [1.0, 0.0]], expected: [reinterpretU16AsF16(0x2e66), reinterpretU16AsF16(0x2e67)] }, // ~0.1
+  // vec3
+  { input: [[0.1, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: [reinterpretU16AsF16(0x2e66), reinterpretU16AsF16(0x2e67)] }, // ~0.1
+  // vec4
+  { input: [[0.1, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], expected: [reinterpretU16AsF16(0x2e66), reinterpretU16AsF16(0x2e67)] }, // ~0.1
+  // Inputs with large values but cancel out to finite result. In these cases, 2.0*2.0 = 4.0 and
+  // 3.0*3.0 = 9.0 is not small enough comparing to kValue.f16.positive.max = 65504, as a result
+  // kValue.f16.positive.max + 9.0 = 65513 is exactly representable in f32 and f64. So, if the
+  // positive and negative large number don't cancel each other first, the computation will
+  // overflow f16 and result in unbounded bounds.
+  // https://github.com/gpuweb/cts/issues/2155
+  { input: [[kValue.f16.positive.max, 1.0, 2.0, 3.0], [-1.0, kValue.f16.positive.max, -2.0, -3.0]], expected: kUnboundedBounds },
+  { input: [[kValue.f16.positive.max, 1.0, 2.0, 3.0], [1.0, kValue.f16.negative.min, 2.0, 3.0]], expected: kUnboundedBounds }]
 
-// vec4
-{ input: [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], expected: 1.0 },
-{ input: [[0.0, 1.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]], expected: 1.0 },
-{ input: [[0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 1.0, 0.0]], expected: 1.0 },
-{ input: [[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]], expected: 1.0 },
-{ input: [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]], expected: 4.0 },
-{ input: [[-1.0, -1.0, -1.0, -1.0], [-1.0, -1.0, -1.0, -1.0]], expected: 4.0 },
-{ input: [[-1.0, 1.0, -1.0, 1.0], [1.0, -1.0, 1.0, -1.0]], expected: -4.0 },
-{ input: [[0.1, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fb9_9999_8000_0000n), reinterpretU64AsF64(0x3fb9_9999_a000_0000n)] }, // ~0.1
+};
 
-// Test that going out of bounds in the intermediate calculations is caught correctly.
-{ input: [[kValue.f32.positive.nearest_max, kValue.f32.positive.max, kValue.f32.negative.min], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
-{ input: [[kValue.f32.positive.nearest_max, kValue.f32.negative.min, kValue.f32.positive.max], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
-{ input: [[kValue.f32.positive.max, kValue.f32.positive.nearest_max, kValue.f32.negative.min], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
-{ input: [[kValue.f32.negative.min, kValue.f32.positive.nearest_max, kValue.f32.positive.max], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
-{ input: [[kValue.f32.positive.max, kValue.f32.negative.min, kValue.f32.positive.nearest_max], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
-{ input: [[kValue.f32.negative.min, kValue.f32.positive.max, kValue.f32.positive.nearest_max], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
+g.test('dotInterval').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+expandWithParams((p) => {
+  const trait = FP[p.trait];
+  const constants = trait.constants();
 
-// https://github.com/gpuweb/cts/issues/2155
-{ input: [[kValue.f32.positive.max, 1.0, 2.0, 3.0], [-1.0, kValue.f32.positive.max, -2.0, -3.0]], expected: [-13, 0] }]).
+  return [
+  // vec2
+  { input: [[1.0, 0.0], [1.0, 0.0]], expected: 1.0 },
+  { input: [[0.0, 1.0], [0.0, 1.0]], expected: 1.0 },
+  { input: [[1.0, 1.0], [1.0, 1.0]], expected: 2.0 },
+  { input: [[-1.0, -1.0], [-1.0, -1.0]], expected: 2.0 },
+  { input: [[-1.0, 1.0], [1.0, -1.0]], expected: -2.0 },
 
+  // vec3
+  { input: [[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: 1.0 },
+  { input: [[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]], expected: 1.0 },
+  { input: [[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]], expected: 1.0 },
+  { input: [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], expected: 3.0 },
+  { input: [[-1.0, -1.0, -1.0], [-1.0, -1.0, -1.0]], expected: 3.0 },
+  { input: [[1.0, -1.0, -1.0], [-1.0, 1.0, -1.0]], expected: -1.0 },
+
+  // vec4
+  { input: [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], expected: 1.0 },
+  { input: [[0.0, 1.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]], expected: 1.0 },
+  { input: [[0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 1.0, 0.0]], expected: 1.0 },
+  { input: [[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]], expected: 1.0 },
+  { input: [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]], expected: 4.0 },
+  { input: [[-1.0, -1.0, -1.0, -1.0], [-1.0, -1.0, -1.0, -1.0]], expected: 4.0 },
+  { input: [[-1.0, 1.0, -1.0, 1.0], [1.0, -1.0, 1.0, -1.0]], expected: -4.0 },
+
+  ...kDotIntervalCases[p.trait],
+
+  // Test that going out of bounds in the intermediate calculations is caught correctly.
+  { input: [[constants.positive.nearest_max, constants.positive.max, constants.negative.min], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
+  { input: [[constants.positive.nearest_max, constants.negative.min, constants.positive.max], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
+  { input: [[constants.positive.max, constants.positive.nearest_max, constants.negative.min], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
+  { input: [[constants.negative.min, constants.positive.nearest_max, constants.positive.max], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
+  { input: [[constants.positive.max, constants.negative.min, constants.positive.nearest_max], [1.0, 1.0, 1.0]], expected: kUnboundedBounds },
+  { input: [[constants.negative.min, constants.positive.max, constants.positive.nearest_max], [1.0, 1.0, 1.0]], expected: kUnboundedBounds }];
+
+})).
 
 fn((t) => {
   const [x, y] = t.params.input;
-  const expected = FP.f32.toInterval(t.params.expected);
-  const got = FP.f32.dotInterval(x, y);
+  const trait = FP[t.params.trait];
+  const expected = trait.toInterval(t.params.expected);
+  const got = trait.dotInterval(x, y);
   t.expect(
   objectEquals(expected, got),
-  `f32.dotInterval([${x}], [${y}]) returned ${got}. Expected ${expected}`);
+  `${t.params.trait}.dotInterval([${x}], [${y}]) returned ${got}. Expected ${expected}`);
 
 });
 
@@ -5742,7 +5875,7 @@ fn((t) => {
 g.test('transposeInterval').
 params((u) =>
 u.
-combine('trait', ['f32', 'f16']).
+combine('trait', ['f32', 'f16', 'abstract']).
 beginSubcases().
 expandWithParams((p) => {
   const trait = FP[p.trait];
@@ -5896,188 +6029,186 @@ fn((t) => {
 g.test('additionMatrixMatrixInterval').
 params((u) =>
 u.
-combine('trait', ['f32', 'abstract']).
+combine('trait', ['f32', 'f16', 'abstract']).
 beginSubcases().
-expandWithParams((_) => {
-  // Only testing that different shapes of matrices are handled correctly
-  // here, to reduce test duplication.
-  // additionMatrixMatrixInterval uses AdditionIntervalOp for calculating intervals,
-  // so the testing for additionInterval covers the actual interval
-  // calculations.
-  return [
-  {
-    input: [
-    [
-    [1, 2],
-    [3, 4]],
+combineWithParams([
+// Only testing that different shapes of matrices are handled correctly
+// here, to reduce test duplication.
+// additionMatrixMatrixInterval uses AdditionIntervalOp for calculating intervals,
+// so the testing for additionInterval covers the actual interval
+// calculations.
+{
+  input: [
+  [
+  [1, 2],
+  [3, 4]],
 
-    [
-    [10, 20],
-    [30, 40]]],
-
-
-    expected: [
-    [11, 22],
-    [33, 44]]
-
-  },
-  {
-    input: [
-    [
-    [1, 2],
-    [3, 4],
-    [5, 6]],
-
-    [
-    [10, 20],
-    [30, 40],
-    [50, 60]]],
+  [
+  [10, 20],
+  [30, 40]]],
 
 
-    expected: [
-    [11, 22],
-    [33, 44],
-    [55, 66]]
+  expected: [
+  [11, 22],
+  [33, 44]]
 
-  },
-  {
-    input: [
-    [
-    [1, 2],
-    [3, 4],
-    [5, 6],
-    [7, 8]],
+},
+{
+  input: [
+  [
+  [1, 2],
+  [3, 4],
+  [5, 6]],
 
-    [
-    [10, 20],
-    [30, 40],
-    [50, 60],
-    [70, 80]]],
+  [
+  [10, 20],
+  [30, 40],
+  [50, 60]]],
 
 
-    expected: [
-    [11, 22],
-    [33, 44],
-    [55, 66],
-    [77, 88]]
+  expected: [
+  [11, 22],
+  [33, 44],
+  [55, 66]]
 
-  },
-  {
-    input: [
-    [
-    [1, 2, 3],
-    [4, 5, 6]],
+},
+{
+  input: [
+  [
+  [1, 2],
+  [3, 4],
+  [5, 6],
+  [7, 8]],
 
-    [
-    [10, 20, 30],
-    [40, 50, 60]]],
-
-
-    expected: [
-    [11, 22, 33],
-    [44, 55, 66]]
-
-  },
-  {
-    input: [
-    [
-    [1, 2, 3],
-    [4, 5, 6],
-    [7, 8, 9]],
-
-    [
-    [10, 20, 30],
-    [40, 50, 60],
-    [70, 80, 90]]],
+  [
+  [10, 20],
+  [30, 40],
+  [50, 60],
+  [70, 80]]],
 
 
-    expected: [
-    [11, 22, 33],
-    [44, 55, 66],
-    [77, 88, 99]]
+  expected: [
+  [11, 22],
+  [33, 44],
+  [55, 66],
+  [77, 88]]
 
-  },
-  {
-    input: [
-    [
-    [1, 2, 3],
-    [4, 5, 6],
-    [7, 8, 9],
-    [10, 11, 12]],
+},
+{
+  input: [
+  [
+  [1, 2, 3],
+  [4, 5, 6]],
 
-    [
-    [10, 20, 30],
-    [40, 50, 60],
-    [70, 80, 90],
-    [1000, 1100, 1200]]],
+  [
+  [10, 20, 30],
+  [40, 50, 60]]],
 
 
-    expected: [
-    [11, 22, 33],
-    [44, 55, 66],
-    [77, 88, 99],
-    [1010, 1111, 1212]]
+  expected: [
+  [11, 22, 33],
+  [44, 55, 66]]
 
-  },
-  {
-    input: [
-    [
-    [1, 2, 3, 4],
-    [5, 6, 7, 8]],
+},
+{
+  input: [
+  [
+  [1, 2, 3],
+  [4, 5, 6],
+  [7, 8, 9]],
 
-    [
-    [10, 20, 30, 40],
-    [50, 60, 70, 80]]],
-
-
-    expected: [
-    [11, 22, 33, 44],
-    [55, 66, 77, 88]]
-
-  },
-  {
-    input: [
-    [
-    [1, 2, 3, 4],
-    [5, 6, 7, 8],
-    [9, 10, 11, 12]],
-
-    [
-    [10, 20, 30, 40],
-    [50, 60, 70, 80],
-    [90, 1000, 1100, 1200]]],
+  [
+  [10, 20, 30],
+  [40, 50, 60],
+  [70, 80, 90]]],
 
 
-    expected: [
-    [11, 22, 33, 44],
-    [55, 66, 77, 88],
-    [99, 1010, 1111, 1212]]
+  expected: [
+  [11, 22, 33],
+  [44, 55, 66],
+  [77, 88, 99]]
 
-  },
-  {
-    input: [
-    [
-    [1, 2, 3, 4],
-    [5, 6, 7, 8],
-    [9, 10, 11, 12],
-    [13, 14, 15, 16]],
+},
+{
+  input: [
+  [
+  [1, 2, 3],
+  [4, 5, 6],
+  [7, 8, 9],
+  [10, 11, 12]],
 
-    [
-    [10, 20, 30, 40],
-    [50, 60, 70, 80],
-    [90, 1000, 1100, 1200],
-    [1300, 1400, 1500, 1600]]],
+  [
+  [10, 20, 30],
+  [40, 50, 60],
+  [70, 80, 90],
+  [1000, 1100, 1200]]],
 
 
-    expected: [
-    [11, 22, 33, 44],
-    [55, 66, 77, 88],
-    [99, 1010, 1111, 1212],
-    [1313, 1414, 1515, 1616]]
+  expected: [
+  [11, 22, 33],
+  [44, 55, 66],
+  [77, 88, 99],
+  [1010, 1111, 1212]]
 
-  }];
+},
+{
+  input: [
+  [
+  [1, 2, 3, 4],
+  [5, 6, 7, 8]],
 
-})).
+  [
+  [10, 20, 30, 40],
+  [50, 60, 70, 80]]],
+
+
+  expected: [
+  [11, 22, 33, 44],
+  [55, 66, 77, 88]]
+
+},
+{
+  input: [
+  [
+  [1, 2, 3, 4],
+  [5, 6, 7, 8],
+  [9, 10, 11, 12]],
+
+  [
+  [10, 20, 30, 40],
+  [50, 60, 70, 80],
+  [90, 1000, 1100, 1200]]],
+
+
+  expected: [
+  [11, 22, 33, 44],
+  [55, 66, 77, 88],
+  [99, 1010, 1111, 1212]]
+
+},
+{
+  input: [
+  [
+  [1, 2, 3, 4],
+  [5, 6, 7, 8],
+  [9, 10, 11, 12],
+  [13, 14, 15, 16]],
+
+  [
+  [10, 20, 30, 40],
+  [50, 60, 70, 80],
+  [90, 1000, 1100, 1200],
+  [1300, 1400, 1500, 1600]]],
+
+
+  expected: [
+  [11, 22, 33, 44],
+  [55, 66, 77, 88],
+  [99, 1010, 1111, 1212],
+  [1313, 1414, 1515, 1616]]
+
+}])).
+
 
 fn((t) => {
   const [x, y] = t.params.input;
@@ -6095,188 +6226,186 @@ fn((t) => {
 g.test('subtractionMatrixMatrixInterval').
 params((u) =>
 u.
-combine('trait', ['f32', 'abstract']).
+combine('trait', ['f32', 'f16', 'abstract']).
 beginSubcases().
-expandWithParams((_) => {
-  // Only testing that different shapes of matrices are handled correctly
-  // here, to reduce test duplication.
-  // subtractionMatrixMatrixInterval uses AdditionIntervalOp for calculating intervals,
-  // so the testing for subtractionInterval covers the actual interval
-  // calculations.
-  return [
-  {
-    input: [
-    [
-    [1, 2],
-    [3, 4]],
+combineWithParams([
+// Only testing that different shapes of matrices are handled correctly
+// here, to reduce test duplication.
+// subtractionMatrixMatrixInterval uses AdditionIntervalOp for calculating intervals,
+// so the testing for subtractionInterval covers the actual interval
+// calculations.
+{
+  input: [
+  [
+  [1, 2],
+  [3, 4]],
 
-    [
-    [-10, -20],
-    [-30, -40]]],
-
-
-    expected: [
-    [11, 22],
-    [33, 44]]
-
-  },
-  {
-    input: [
-    [
-    [1, 2],
-    [3, 4],
-    [5, 6]],
-
-    [
-    [-10, -20],
-    [-30, -40],
-    [-50, -60]]],
+  [
+  [-10, -20],
+  [-30, -40]]],
 
 
-    expected: [
-    [11, 22],
-    [33, 44],
-    [55, 66]]
+  expected: [
+  [11, 22],
+  [33, 44]]
 
-  },
-  {
-    input: [
-    [
-    [1, 2],
-    [3, 4],
-    [5, 6],
-    [7, 8]],
+},
+{
+  input: [
+  [
+  [1, 2],
+  [3, 4],
+  [5, 6]],
 
-    [
-    [-10, -20],
-    [-30, -40],
-    [-50, -60],
-    [-70, -80]]],
+  [
+  [-10, -20],
+  [-30, -40],
+  [-50, -60]]],
 
 
-    expected: [
-    [11, 22],
-    [33, 44],
-    [55, 66],
-    [77, 88]]
+  expected: [
+  [11, 22],
+  [33, 44],
+  [55, 66]]
 
-  },
-  {
-    input: [
-    [
-    [1, 2, 3],
-    [4, 5, 6]],
+},
+{
+  input: [
+  [
+  [1, 2],
+  [3, 4],
+  [5, 6],
+  [7, 8]],
 
-    [
-    [-10, -20, -30],
-    [-40, -50, -60]]],
-
-
-    expected: [
-    [11, 22, 33],
-    [44, 55, 66]]
-
-  },
-  {
-    input: [
-    [
-    [1, 2, 3],
-    [4, 5, 6],
-    [7, 8, 9]],
-
-    [
-    [-10, -20, -30],
-    [-40, -50, -60],
-    [-70, -80, -90]]],
+  [
+  [-10, -20],
+  [-30, -40],
+  [-50, -60],
+  [-70, -80]]],
 
 
-    expected: [
-    [11, 22, 33],
-    [44, 55, 66],
-    [77, 88, 99]]
+  expected: [
+  [11, 22],
+  [33, 44],
+  [55, 66],
+  [77, 88]]
 
-  },
-  {
-    input: [
-    [
-    [1, 2, 3],
-    [4, 5, 6],
-    [7, 8, 9],
-    [10, 11, 12]],
+},
+{
+  input: [
+  [
+  [1, 2, 3],
+  [4, 5, 6]],
 
-    [
-    [-10, -20, -30],
-    [-40, -50, -60],
-    [-70, -80, -90],
-    [-1000, -1100, -1200]]],
+  [
+  [-10, -20, -30],
+  [-40, -50, -60]]],
 
 
-    expected: [
-    [11, 22, 33],
-    [44, 55, 66],
-    [77, 88, 99],
-    [1010, 1111, 1212]]
+  expected: [
+  [11, 22, 33],
+  [44, 55, 66]]
 
-  },
-  {
-    input: [
-    [
-    [1, 2, 3, 4],
-    [5, 6, 7, 8]],
+},
+{
+  input: [
+  [
+  [1, 2, 3],
+  [4, 5, 6],
+  [7, 8, 9]],
 
-    [
-    [-10, -20, -30, -40],
-    [-50, -60, -70, -80]]],
-
-
-    expected: [
-    [11, 22, 33, 44],
-    [55, 66, 77, 88]]
-
-  },
-  {
-    input: [
-    [
-    [1, 2, 3, 4],
-    [5, 6, 7, 8],
-    [9, 10, 11, 12]],
-
-    [
-    [-10, -20, -30, -40],
-    [-50, -60, -70, -80],
-    [-90, -1000, -1100, -1200]]],
+  [
+  [-10, -20, -30],
+  [-40, -50, -60],
+  [-70, -80, -90]]],
 
 
-    expected: [
-    [11, 22, 33, 44],
-    [55, 66, 77, 88],
-    [99, 1010, 1111, 1212]]
+  expected: [
+  [11, 22, 33],
+  [44, 55, 66],
+  [77, 88, 99]]
 
-  },
-  {
-    input: [
-    [
-    [1, 2, 3, 4],
-    [5, 6, 7, 8],
-    [9, 10, 11, 12],
-    [13, 14, 15, 16]],
+},
+{
+  input: [
+  [
+  [1, 2, 3],
+  [4, 5, 6],
+  [7, 8, 9],
+  [10, 11, 12]],
 
-    [
-    [-10, -20, -30, -40],
-    [-50, -60, -70, -80],
-    [-90, -1000, -1100, -1200],
-    [-1300, -1400, -1500, -1600]]],
+  [
+  [-10, -20, -30],
+  [-40, -50, -60],
+  [-70, -80, -90],
+  [-1000, -1100, -1200]]],
 
 
-    expected: [
-    [11, 22, 33, 44],
-    [55, 66, 77, 88],
-    [99, 1010, 1111, 1212],
-    [1313, 1414, 1515, 1616]]
+  expected: [
+  [11, 22, 33],
+  [44, 55, 66],
+  [77, 88, 99],
+  [1010, 1111, 1212]]
 
-  }];
+},
+{
+  input: [
+  [
+  [1, 2, 3, 4],
+  [5, 6, 7, 8]],
 
-})).
+  [
+  [-10, -20, -30, -40],
+  [-50, -60, -70, -80]]],
+
+
+  expected: [
+  [11, 22, 33, 44],
+  [55, 66, 77, 88]]
+
+},
+{
+  input: [
+  [
+  [1, 2, 3, 4],
+  [5, 6, 7, 8],
+  [9, 10, 11, 12]],
+
+  [
+  [-10, -20, -30, -40],
+  [-50, -60, -70, -80],
+  [-90, -1000, -1100, -1200]]],
+
+
+  expected: [
+  [11, 22, 33, 44],
+  [55, 66, 77, 88],
+  [99, 1010, 1111, 1212]]
+
+},
+{
+  input: [
+  [
+  [1, 2, 3, 4],
+  [5, 6, 7, 8],
+  [9, 10, 11, 12],
+  [13, 14, 15, 16]],
+
+  [
+  [-10, -20, -30, -40],
+  [-50, -60, -70, -80],
+  [-90, -1000, -1100, -1200],
+  [-1300, -1400, -1500, -1600]]],
+
+
+  expected: [
+  [11, 22, 33, 44],
+  [55, 66, 77, 88],
+  [99, 1010, 1111, 1212],
+  [1313, 1414, 1515, 1616]]
+
+}])).
+
 
 fn((t) => {
   const [x, y] = t.params.input;
@@ -6291,13 +6420,19 @@ fn((t) => {
 
 });
 
-g.test('multiplicationMatrixMatrixInterval_f32').
-paramsSubcasesOnly([
+g.test('multiplicationMatrixMatrixInterval').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+combineWithParams([
 // Only testing that different shapes of matrices are handled correctly
 // here, to reduce test duplication.
 // multiplicationMatrixMatrixInterval uses and transposeInterval &
 // dotInterval for calculating intervals, so the testing for those functions
 // will cover the actual interval calculations.
+// Keep all expected result integer no larger than 2047 to ensure that all result is exactly
+// represeantable in both f32 and f16.
 {
   input: [
   [
@@ -6431,6 +6566,24 @@ paramsSubcasesOnly([
   [
   [11, 22],
   [33, 44],
+  [55, 66]]],
+
+
+  expected: [
+  [121, 154, 187, 220],
+  [253, 330, 407, 484],
+  [385, 506, 627, 748]]
+
+},
+{
+  input: [
+  [
+  [1, 2, 3, 4],
+  [5, 6, 7, 8]],
+
+  [
+  [11, 22],
+  [33, 44],
   [55, 66],
   [77, 88]]],
 
@@ -6489,14 +6642,14 @@ paramsSubcasesOnly([
   [11, 22, 33],
   [44, 55, 66],
   [77, 88, 99],
-  [1010, 1111, 1212]]],
+  [10, 11, 12]]],
 
 
   expected: [
   [242, 308],
   [539, 704],
   [836, 1100],
-  [10403, 13736]]
+  [103, 136]]
 
 },
 {
@@ -6546,14 +6699,14 @@ paramsSubcasesOnly([
   [11, 22, 33],
   [44, 55, 66],
   [77, 88, 99],
-  [1010, 1111, 1212]]],
+  [10, 11, 12]]],
 
 
   expected: [
   [330, 396, 462],
   [726, 891, 1056],
   [1122, 1386, 1650],
-  [13938, 17271, 20604]]
+  [138, 171, 204]]
 
 },
 {
@@ -6561,16 +6714,16 @@ paramsSubcasesOnly([
   [
   [1, 2, 3, 4],
   [5, 6, 7, 8],
-  [9, 11, 11, 12]],
+  [9, 10, 11, 12]],
 
   [
-  [11, 22, 33],
-  [44, 55, 66]]],
+  [11, 12, 13],
+  [21, 22, 23]]],
 
 
   expected: [
-  [418, 517, 550, 616],
-  [913, 1144, 1243, 1408]]
+  [188, 224, 260, 296],
+  [338, 404, 470, 536]]
 
 },
 {
@@ -6578,18 +6731,18 @@ paramsSubcasesOnly([
   [
   [1, 2, 3, 4],
   [5, 6, 7, 8],
-  [9, 11, 11, 12]],
+  [9, 10, 11, 12]],
 
   [
-  [11, 22, 33],
-  [44, 55, 66],
-  [77, 88, 99]]],
+  [11, 12, 13],
+  [21, 22, 23],
+  [31, 32, 33]]],
 
 
   expected: [
-  [418, 517, 550, 616],
-  [913, 1144, 1243, 1408],
-  [1408, 1771, 1936, 2200]]
+  [188, 224, 260, 296],
+  [338, 404, 470, 536],
+  [488, 584, 680, 776]]
 
 },
 {
@@ -6597,20 +6750,20 @@ paramsSubcasesOnly([
   [
   [1, 2, 3, 4],
   [5, 6, 7, 8],
-  [9, 11, 11, 12]],
+  [9, 10, 11, 12]],
 
   [
-  [11, 22, 33],
-  [44, 55, 66],
-  [77, 88, 99],
-  [1010, 1111, 1212]]],
+  [11, 12, 13],
+  [21, 22, 23],
+  [31, 32, 33],
+  [41, 42, 43]]],
 
 
   expected: [
-  [418, 517, 550, 616],
-  [913, 1144, 1243, 1408],
-  [1408, 1771, 1936, 2200],
-  [17473, 22018, 24139, 27472]]
+  [188, 224, 260, 296],
+  [338, 404, 470, 536],
+  [488, 584, 680, 776],
+  [638, 764, 890, 1016]]
 
 },
 {
@@ -6640,15 +6793,15 @@ paramsSubcasesOnly([
   [7, 8]],
 
   [
-  [11, 22, 33, 44],
-  [55, 66, 77, 88],
-  [99, 1010, 1111, 1212]]],
+  [11, 12, 13, 14],
+  [21, 22, 23, 24],
+  [31, 32, 33, 34]]],
 
 
   expected: [
-  [550, 660],
-  [1254, 1540],
-  [17168, 20600]]
+  [210, 260],
+  [370, 460],
+  [530, 660]]
 
 },
 {
@@ -6660,17 +6813,17 @@ paramsSubcasesOnly([
   [7, 8]],
 
   [
-  [11, 22, 33, 44],
-  [55, 66, 77, 88],
-  [99, 1010, 1111, 1212],
-  [1313, 1414, 1515, 1616]]],
+  [11, 12, 13, 14],
+  [21, 22, 23, 24],
+  [31, 32, 33, 34],
+  [41, 42, 43, 44]]],
 
 
   expected: [
-  [550, 660],
-  [1254, 1540],
-  [17168, 20600],
-  [24442, 30300]]
+  [210, 260],
+  [370, 460],
+  [530, 660],
+  [690, 860]]
 
 },
 {
@@ -6679,16 +6832,16 @@ paramsSubcasesOnly([
   [1, 2, 3],
   [4, 5, 6],
   [7, 8, 9],
-  [11, 11, 12]],
+  [10, 11, 12]],
 
   [
-  [11, 22, 33, 44],
-  [55, 66, 77, 88]]],
+  [11, 12, 13, 14],
+  [21, 22, 23, 24]]],
 
 
   expected: [
-  [814, 880, 990],
-  [1826, 2024, 2310]]
+  [290, 340, 390],
+  [510, 600, 690]]
 
 },
 {
@@ -6697,18 +6850,18 @@ paramsSubcasesOnly([
   [1, 2, 3],
   [4, 5, 6],
   [7, 8, 9],
-  [11, 11, 12]],
+  [10, 11, 12]],
 
   [
-  [11, 22, 33, 44],
-  [55, 66, 77, 88],
-  [99, 1010, 1111, 1212]]],
+  [11, 12, 13, 14],
+  [21, 22, 23, 24],
+  [31, 32, 33, 34]]],
 
 
   expected: [
-  [814, 880, 990],
-  [1826, 2024, 2310],
-  [25248, 27468, 30900]]
+  [290, 340, 390],
+  [510, 600, 690],
+  [730, 860, 990]]
 
 },
 {
@@ -6717,20 +6870,20 @@ paramsSubcasesOnly([
   [1, 2, 3],
   [4, 5, 6],
   [7, 8, 9],
-  [11, 11, 12]],
+  [10, 11, 12]],
 
   [
-  [11, 22, 33, 44],
-  [55, 66, 77, 88],
-  [99, 1010, 1111, 1212],
-  [1313, 1414, 1515, 1616]]],
+  [11, 12, 13, 14],
+  [21, 22, 23, 24],
+  [31, 32, 33, 34],
+  [41, 42, 43, 44]]],
 
 
   expected: [
-  [814, 880, 990],
-  [1826, 2024, 2310],
-  [25248, 27468, 30900],
-  [35350, 39592, 45450]]
+  [290, 340, 390],
+  [510, 600, 690],
+  [730, 860, 990],
+  [950, 1120, 1290]]
 
 },
 {
@@ -6738,19 +6891,17 @@ paramsSubcasesOnly([
   [
   [1, 2, 3, 4],
   [5, 6, 7, 8],
-  [9, 11, 11, 12],
+  [9, 10, 11, 12],
   [13, 14, 15, 16]],
 
   [
-  [11, 22, 33, 44],
-  [55, 66, 77, 88],
-  [99, 1010, 1111, 1212]]],
+  [11, 12, 13, 14],
+  [21, 22, 23, 24]]],
 
 
   expected: [
-  [990, 1133, 1210, 1320],
-  [2222, 2585, 2794, 3080],
-  [30904, 35447, 37768, 41200]]
+  [370, 420, 470, 520],
+  [650, 740, 830, 920]]
 
 },
 {
@@ -6758,33 +6909,57 @@ paramsSubcasesOnly([
   [
   [1, 2, 3, 4],
   [5, 6, 7, 8],
-  [9, 11, 11, 12],
+  [9, 10, 11, 12],
   [13, 14, 15, 16]],
 
   [
-  [11, 22, 33, 44],
-  [55, 66, 77, 88],
-  [99, 1010, 1111, 1212],
-  [1313, 1414, 1515, 1616]]],
+  [11, 12, 13, 14],
+  [21, 22, 23, 24],
+  [31, 32, 33, 34]]],
 
 
   expected: [
-  [990, 1133, 1210, 1320],
-  [2222, 2585, 2794, 3080],
-  [30904, 35447, 37768, 41200],
-  [43026, 50399, 54742, 60600]]
+  [370, 420, 470, 520],
+  [650, 740, 830, 920],
+  [930, 1060, 1190, 1320]]
 
-}]).
+},
+{
+  input: [
+  [
+  [1, 2, 3, 4],
+  [5, 6, 7, 8],
+  [9, 10, 11, 12],
+  [13, 14, 15, 16]],
+
+  [
+  [11, 12, 13, 14],
+  [21, 22, 23, 24],
+  [31, 32, 33, 34],
+  [41, 42, 43, 44]]],
+
+
+  expected: [
+  [370, 420, 470, 520],
+  [650, 740, 830, 920],
+  [930, 1060, 1190, 1320],
+  [1210, 1380, 1550, 1720]]
+
+}])).
+
 
 fn((t) => {
   const [x, y] = t.params.input;
-  const expected = FP.f32.toMatrix(t.params.expected);
-  const got = FP.f32.multiplicationMatrixMatrixInterval(x, y);
+  const trait = FP[t.params.trait];
+  const expected = trait.toMatrix(t.params.expected);
+  const got = trait.multiplicationMatrixMatrixInterval(x, y);
   t.expect(
   objectEquals(expected, got),
-  `f32.multiplicationMatrixMatrixInterval([${JSON.stringify(x)}], [${JSON.stringify(
-  y)
-  }]) returned '[${JSON.stringify(got)}]'. Expected '[${JSON.stringify(expected)}]'`);
+  `${t.params.trait}.multiplicationMatrixMatrixInterval([${JSON.stringify(
+  x)
+  }], [${JSON.stringify(y)}]) returned '[${JSON.stringify(got)}]'. Expected '[${JSON.stringify(
+  expected)
+  }]'`);
 
 });
 
@@ -6794,8 +6969,12 @@ fn((t) => {
 
 
 
-g.test('multiplicationMatrixScalarInterval_f32').
-paramsSubcasesOnly([
+g.test('multiplicationMatrixScalarInterval').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+combineWithParams([
 // Only testing that different shapes of matrices are handled correctly
 // here, to reduce test duplication.
 // multiplicationMatrixScalarInterval uses MultiplicationIntervalOp for calculating intervals,
@@ -6917,16 +7096,18 @@ paramsSubcasesOnly([
   [90, 100, 110, 120],
   [130, 140, 150, 160]]
 
-}]).
+}])).
+
 
 fn((t) => {
   const matrix = t.params.matrix;
   const scalar = t.params.scalar;
-  const expected = FP.f32.toMatrix(t.params.expected);
-  const got = FP.f32.multiplicationMatrixScalarInterval(matrix, scalar);
+  const trait = FP[t.params.trait];
+  const expected = trait.toMatrix(t.params.expected);
+  const got = trait.multiplicationMatrixScalarInterval(matrix, scalar);
   t.expect(
   objectEquals(expected, got),
-  `f32.multiplicationMatrixScalarInterval([${JSON.stringify(
+  `${t.params.trait}.multiplicationMatrixScalarInterval([${JSON.stringify(
   matrix)
   }], ${scalar}) returned '[${JSON.stringify(got)}]'. Expected '[${JSON.stringify(expected)}]'`);
 
@@ -6941,8 +7122,12 @@ fn((t) => {
 
 
 
-g.test('multiplicationMatrixVectorInterval_f32').
-paramsSubcasesOnly([
+g.test('multiplicationMatrixVectorInterval').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+combineWithParams([
 // Only testing that different shapes of matrices are handled correctly
 // here, to reduce test duplication.
 // multiplicationMatrixVectorInterval uses DotIntervalOp &
@@ -7029,18 +7214,22 @@ paramsSubcasesOnly([
 
   vector: [11, 22, 33, 44],
   expected: [990, 1100, 1210, 1320]
-}]).
+}])).
+
 
 fn((t) => {
   const matrix = t.params.matrix;
   const vector = t.params.vector;
-  const expected = FP.f32.toVector(t.params.expected);
-  const got = FP.f32.multiplicationMatrixVectorInterval(matrix, vector);
+  const trait = FP[t.params.trait];
+  const expected = trait.toVector(t.params.expected);
+  const got = trait.multiplicationMatrixVectorInterval(matrix, vector);
   t.expect(
   objectEquals(expected, got),
-  `f32multiplicationMatrixVectorInterval([${JSON.stringify(matrix)}], [${JSON.stringify(
-  vector)
-  }]) returned '[${JSON.stringify(got)}]'. Expected '[${JSON.stringify(expected)}]'`);
+  `${t.params.trait}.multiplicationMatrixVectorInterval([${JSON.stringify(
+  matrix)
+  }], [${JSON.stringify(vector)}]) returned '[${JSON.stringify(
+  got)
+  }]'. Expected '[${JSON.stringify(expected)}]'`);
 
 });
 
@@ -7051,12 +7240,18 @@ fn((t) => {
 
 
 g.test('multiplicationVectorMatrixInterval_f32').
-paramsSubcasesOnly([
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+combineWithParams([
 // Only testing that different shapes of matrices are handled correctly
 // here, to reduce test duplication.
 // multiplicationVectorMatrixInterval uses DotIntervalOp for calculating
 // intervals, so the testing for dotInterval covers the actual interval
 // calculations.
+// Keep all expected result integer no larger than 2047 to ensure that all result is exactly
+// represeantable in both f32 and f16.
 {
   vector: [1, 2],
   matrix: [
@@ -7087,68 +7282,72 @@ paramsSubcasesOnly([
 {
   vector: [1, 2, 3],
   matrix: [
-  [11, 22, 33],
-  [44, 55, 66]],
+  [11, 12, 13],
+  [21, 22, 23]],
 
-  expected: [154, 352]
+  expected: [74, 134]
 },
 {
   vector: [1, 2, 3],
   matrix: [
-  [11, 22, 33],
-  [44, 55, 66],
-  [77, 88, 99]],
+  [11, 12, 13],
+  [21, 22, 23],
+  [31, 32, 33]],
 
-  expected: [154, 352, 550]
+  expected: [74, 134, 194]
 },
 {
   vector: [1, 2, 3],
   matrix: [
-  [11, 22, 33],
-  [44, 55, 66],
-  [77, 88, 99],
-  [1010, 1111, 1212]],
+  [11, 12, 13],
+  [21, 22, 23],
+  [31, 32, 33],
+  [41, 42, 43]],
 
-  expected: [154, 352, 550, 6868]
+  expected: [74, 134, 194, 254]
 },
 {
   vector: [1, 2, 3, 4],
   matrix: [
-  [11, 22, 33, 44],
-  [55, 66, 77, 88]],
+  [11, 12, 13, 14],
+  [21, 22, 23, 24]],
 
-  expected: [330, 770]
+  expected: [130, 230]
 },
 {
   vector: [1, 2, 3, 4],
   matrix: [
-  [11, 22, 33, 44],
-  [55, 66, 77, 88],
-  [99, 1010, 1111, 1212]],
+  [11, 12, 13, 14],
+  [21, 22, 23, 24],
+  [31, 32, 33, 34]],
 
-  expected: [330, 770, 10300]
+  expected: [130, 230, 330]
 },
 {
   vector: [1, 2, 3, 4],
   matrix: [
-  [11, 22, 33, 44],
-  [55, 66, 77, 88],
-  [99, 1010, 1111, 1212],
-  [1313, 1414, 1515, 1616]],
+  [11, 12, 13, 14],
+  [21, 22, 23, 24],
+  [31, 32, 33, 34],
+  [41, 42, 43, 44]],
 
-  expected: [330, 770, 10300, 15150]
-}]).
+  expected: [130, 230, 330, 430]
+}])).
+
 
 fn((t) => {
   const vector = t.params.vector;
   const matrix = t.params.matrix;
-  const expected = FP.f32.toVector(t.params.expected);
-  const got = FP.f32.multiplicationVectorMatrixInterval(vector, matrix);
+  const trait = FP[t.params.trait];
+  const expected = trait.toVector(t.params.expected);
+  const got = trait.multiplicationVectorMatrixInterval(vector, matrix);
   t.expect(
   objectEquals(expected, got),
-  `f32.multiplicationVectorMatrixInterval([${JSON.stringify(vector)}], [${JSON.stringify(
-  matrix)
-  }]) returned '[${JSON.stringify(got)}]'. Expected '[${JSON.stringify(expected)}]'`);
+  `${t.params.trait}.multiplicationVectorMatrixInterval([${JSON.stringify(
+  vector)
+  }], [${JSON.stringify(matrix)}]) returned '[${JSON.stringify(
+  got)
+  }]'. Expected '[${JSON.stringify(expected)}]'`);
 
 });
 
