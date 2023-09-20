@@ -2719,12 +2719,26 @@ const kDegreesIntervalCases = {
     { input: kValue.f16.positive.pi.three_quarters, expected: [kMinusOneULPFunctions['f16'](135), 135] },
     { input: kValue.f16.positive.pi.whole, expected: [kMinusOneULPFunctions['f16'](180), 180] },
   ] as ScalarToIntervalCase[],
+  abstract: [
+    { input: kValue.f64.negative.pi.whole, expected: -180 },
+    { input: kValue.f64.negative.pi.three_quarters, expected: -135 },
+    { input: kValue.f64.negative.pi.half, expected: -90 },
+    { input: kValue.f64.negative.pi.third, expected: kPlusOneULPFunctions['abstract'](-60) },
+    { input: kValue.f64.negative.pi.quarter, expected: -45 },
+    { input: kValue.f64.negative.pi.sixth, expected: kPlusOneULPFunctions['abstract'](-30) },
+    { input: kValue.f64.positive.pi.sixth, expected: kMinusOneULPFunctions['abstract'](30) },
+    { input: kValue.f64.positive.pi.quarter, expected: 45 },
+    { input: kValue.f64.positive.pi.third, expected: kMinusOneULPFunctions['abstract'](60) },
+    { input: kValue.f64.positive.pi.half, expected: 90 },
+    { input: kValue.f64.positive.pi.three_quarters, expected: 135 },
+    { input: kValue.f64.positive.pi.whole, expected: 180 },
+  ] as ScalarToIntervalCase[],
 } as const;
 
 g.test('degreesInterval')
   .params(u =>
     u
-      .combine('trait', ['f32', 'f16'] as const)
+      .combine('trait', ['f32', 'f16', 'abstract'] as const)
       .beginSubcases()
       .expandWithParams<ScalarToIntervalCase>(p => {
         const trait = p.trait;
@@ -2750,55 +2764,124 @@ g.test('degreesInterval')
     );
   });
 
-g.test('expInterval_f32')
-  .paramsSubcasesOnly<ScalarToIntervalCase>(
-    // prettier-ignore
-    [
-      { input: kValue.f32.infinity.negative, expected: kUnboundedBounds },
-      { input: 0, expected: 1 },
-      { input: 1, expected: [kValue.f32.positive.e, kPlusOneULPFunctions['f32'](kValue.f32.positive.e)] },
-      { input: 89, expected: kUnboundedBounds },
-    ]
+// prettier-ignore
+const kExpIntervalCases = {
+  f32: [
+    { input: 1, expected: [kValue.f32.positive.e, kPlusOneULPFunctions['f32'](kValue.f32.positive.e)] },
+    // exp(88) = 1.6516362549940018555283297962649e+38 = 0x7ef882b6/7.
+    { input: 88, expected: [reinterpretU32AsF32(0x7ef882b6), reinterpretU32AsF32(0x7ef882b7)] },
+    // exp(89) overflow f32.
+    { input: 89, expected: kUnboundedBounds },
+  ] as ScalarToIntervalCase[],
+  f16: [
+    { input: 1, expected: [kValue.f16.positive.e, kPlusOneULPFunctions['f16'](kValue.f16.positive.e)] },
+    // exp(11) = 59874.141715197818455326485792258 = 0x7b4f/0x7b50.
+    { input: 11, expected: [reinterpretU16AsF16(0x7b4f), reinterpretU16AsF16(0x7b50)] },
+    // exp(12) = 162754.79141900392080800520489849 overflow f16.
+    { input: 12, expected: kUnboundedBounds },
+  ] as ScalarToIntervalCase[],
+} as const;
+
+g.test('expInterval')
+  .params(u =>
+    u
+      .combine('trait', ['f32', 'f16'] as const)
+      .beginSubcases()
+      .expandWithParams<ScalarToIntervalCase>(p => {
+        const trait = p.trait;
+        const constants = FP[trait].constants();
+        // prettier-ignore
+        return [
+          { input: constants.negative.infinity, expected: kUnboundedBounds },
+          { input: 0, expected: 1 },
+          ...kExpIntervalCases[trait],
+        ];
+      })
   )
   .fn(t => {
+    const trait = FP[t.params.trait];
     const error = (x: number): number => {
-      const n = 3 + 2 * Math.abs(t.params.input);
-      return n * oneULPF32(x);
+      let ulp_error;
+      switch (t.params.trait) {
+        case 'f32': {
+          ulp_error = 3 + 2 * Math.abs(t.params.input);
+          break;
+        }
+        case 'f16': {
+          ulp_error = 1 + 2 * Math.abs(t.params.input);
+          break;
+        }
+      }
+      return ulp_error * trait.oneULP(x);
     };
 
     t.params.expected = applyError(t.params.expected, error);
-    const expected = FP.f32.toInterval(t.params.expected);
+    const expected = trait.toInterval(t.params.expected);
+    const got = trait.expInterval(t.params.input);
 
-    const got = FP.f32.expInterval(t.params.input);
     t.expect(
       objectEquals(expected, got),
-      `f32.expInterval(${t.params.input}) returned ${got}. Expected ${expected}`
+      `${t.params.trait}.expInterval(${t.params.input}) returned ${got}. Expected ${expected}`
     );
   });
 
-g.test('exp2Interval_f32')
-  .paramsSubcasesOnly<ScalarToIntervalCase>(
-    // prettier-ignore
-    [
-      { input: kValue.f32.infinity.negative, expected: kUnboundedBounds },
-      { input: 0, expected: 1 },
-      { input: 1, expected: 2 },
-      { input: 128, expected: kUnboundedBounds },
-    ]
+// prettier-ignore
+const kExp2IntervalCases = {
+  f32: [
+    // exp2(127) = 1.7014118346046923173168730371588e+38 = 0x7f000000, 3 + 2 * 127 = 258 ulps.
+    { input: 127, expected: reinterpretU32AsF32(0x7f000000) },
+    // exp2(128) overflow f32.
+    { input: 128, expected: kUnboundedBounds },
+  ] as ScalarToIntervalCase[],
+  f16: [
+    // exp2(15) = 32768 = 0x7800, 1 + 2 * 15 = 31 ulps
+    { input: 15, expected: reinterpretU16AsF16(0x7800) },
+    // exp2(16) = 65536 overflow f16.
+    { input: 16, expected: kUnboundedBounds },
+  ] as ScalarToIntervalCase[],
+} as const;
+
+g.test('exp2Interval')
+  .params(u =>
+    u
+      .combine('trait', ['f32', 'f16'] as const)
+      .beginSubcases()
+      .expandWithParams<ScalarToIntervalCase>(p => {
+        const trait = p.trait;
+        const constants = FP[trait].constants();
+        // prettier-ignore
+        return [
+          { input: constants.negative.infinity, expected: kUnboundedBounds },
+          { input: 0, expected: 1 },
+          { input: 1, expected: 2 },
+          ...kExp2IntervalCases[trait],
+        ];
+      })
   )
   .fn(t => {
+    const trait = FP[t.params.trait];
     const error = (x: number): number => {
-      const n = 3 + 2 * Math.abs(t.params.input);
-      return n * oneULPF32(x);
+      let ulp_error;
+      switch (t.params.trait) {
+        case 'f32': {
+          ulp_error = 3 + 2 * Math.abs(t.params.input);
+          break;
+        }
+        case 'f16': {
+          ulp_error = 1 + 2 * Math.abs(t.params.input);
+          break;
+        }
+      }
+      return ulp_error * trait.oneULP(x);
     };
 
     t.params.expected = applyError(t.params.expected, error);
-    const expected = FP.f32.toInterval(t.params.expected);
+    const expected = trait.toInterval(t.params.expected);
 
-    const got = FP.f32.exp2Interval(t.params.input);
+    const got = trait.exp2Interval(t.params.input);
     t.expect(
       objectEquals(expected, got),
-      `f32.exp2Interval(${t.params.input}) returned ${got}. Expected ${expected}`
+      `${t.params.trait}.exp2Interval(${t.params.input}) returned ${got}. Expected ${expected}`
     );
   });
 
@@ -3380,41 +3463,71 @@ g.test('roundInterval')
     );
   });
 
-g.test('saturateInterval_f32')
-  .paramsSubcasesOnly<ScalarToIntervalCase>(
-    // prettier-ignore
-    [
-      // Normals
-      { input: 0, expected: 0 },
-      { input: 1, expected: 1.0 },
-      { input: -0.1, expected: 0 },
-      { input: -1, expected: 0 },
-      { input: -10, expected: 0 },
-      { input: 0.1, expected: [kMinusOneULPFunctions['f32'](reinterpretU32AsF32(0x3dcccccd)), reinterpretU32AsF32(0x3dcccccd)] },  // ~0.1
-      { input: 10, expected: 1.0 },
-      { input: 11.1, expected: 1.0 },
-      { input: kValue.f32.positive.max, expected: 1.0 },
-      { input: kValue.f32.positive.min, expected: kValue.f32.positive.min },
-      { input: kValue.f32.negative.max, expected: 0.0 },
-      { input: kValue.f32.negative.min, expected: 0.0 },
+// Need to explicitly coerce expected value to IntervalBounds, because TS
+// doesn't correctly infer the type later.
+const kSaturateIntervalCases = {
+  f32: [
+    {
+      input: 0.1,
+      expected: [
+        kMinusOneULPFunctions['f32'](reinterpretU32AsF32(0x3dcccccd)),
+        reinterpretU32AsF32(0x3dcccccd),
+      ],
+    }, // ~0.1
+  ] as ScalarToIntervalCase[],
+  f16: [
+    {
+      input: 0.1,
+      expected: [
+        reinterpretU16AsF16(0x2e66),
+        kPlusOneULPFunctions['f16'](reinterpretU16AsF16(0x2e66)),
+      ],
+    }, // ~0.1
+  ] as ScalarToIntervalCase[],
+} as const;
 
-      // Subnormals
-      { input: kValue.f32.subnormal.positive.max, expected: [0.0, kValue.f32.subnormal.positive.max] },
-      { input: kValue.f32.subnormal.positive.min, expected: [0.0, kValue.f32.subnormal.positive.min] },
-      { input: kValue.f32.subnormal.negative.min, expected: [kValue.f32.subnormal.negative.min, 0.0] },
-      { input: kValue.f32.subnormal.negative.max, expected: [kValue.f32.subnormal.negative.max, 0.0] },
+g.test('saturateInterval')
+  .params(u =>
+    u
+      .combine('trait', ['f32', 'f16'] as const)
+      .beginSubcases()
+      .expandWithParams<ScalarToIntervalCase>(p => {
+        const constants = FP[p.trait].constants();
+        // prettier-ignore
+        return [
+          // Normals
+          { input: 0, expected: 0 },
+          { input: 1, expected: 1.0 },
+          { input: -0.1, expected: 0 },
+          { input: -1, expected: 0 },
+          { input: -10, expected: 0 },
+          { input: 10, expected: 1.0 },
+          { input: 11.1, expected: 1.0 },
+          { input: constants.positive.max, expected: 1.0 },
+          { input: constants.positive.min, expected: constants.positive.min },
+          { input: constants.negative.max, expected: 0.0 },
+          { input: constants.negative.min, expected: 0.0 },
 
-      // Infinities
-      { input: kValue.f32.infinity.positive, expected: kUnboundedBounds },
-      { input: kValue.f32.infinity.negative, expected: kUnboundedBounds },
-    ]
+          // Subnormals
+          { input: constants.positive.subnormal.max, expected: [0.0, constants.positive.subnormal.max] },
+          { input: constants.positive.subnormal.min, expected: [0.0, constants.positive.subnormal.min] },
+          { input: constants.negative.subnormal.min, expected: [constants.negative.subnormal.min, 0.0] },
+          { input: constants.negative.subnormal.max, expected: [constants.negative.subnormal.max, 0.0] },
+
+          // Infinities
+          { input: constants.positive.infinity, expected: kUnboundedBounds },
+          { input: constants.negative.infinity, expected: kUnboundedBounds },
+          ...kSaturateIntervalCases[p.trait],
+        ];
+      })
   )
   .fn(t => {
-    const expected = FP.f32.toInterval(t.params.expected);
-    const got = FP.f32.saturateInterval(t.params.input);
+    const trait = FP[t.params.trait];
+    const expected = trait.toInterval(t.params.expected);
+    const got = trait.saturateInterval(t.params.input);
     t.expect(
       objectEquals(expected, got),
-      `f32.saturationInterval(${t.params.input}) returned ${got}. Expected ${expected}`
+      `${t.params.trait}.saturationInterval(${t.params.input}) returned ${got}. Expected ${expected}`
     );
   });
 

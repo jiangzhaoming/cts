@@ -32,7 +32,7 @@
 </script>
 <script type=module src=/webgpu/common/runtime/wpt.js></script>
 
-<!-- Prefix: "?q="; 7797 variants generated from 1940 tests in 442 files -->
+<!-- Prefix: "?q="; 7814 variants generated from 1948 tests in 443 files -->
 <meta name=variant content='?q=webgpu:api,operation,adapter,requestAdapter:requestAdapter:*'><!-- estimated: 1368.747 ms -->
 <meta name=variant content='?q=webgpu:api,operation,adapter,requestAdapter:requestAdapter_no_parameters:*'><!-- estimated: 384.601 ms -->
 <meta name=variant content='?q=webgpu:api,operation,adapter,requestAdapterInfo:adapter_info:*'><!-- estimated: 136.601 ms -->
@@ -5735,7 +5735,7 @@
 <meta name=variant content='?q=webgpu:shader,execution,expression,binary,f16_division:vector:*'><!-- estimated: 66.060 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,binary,f16_division:scalar_compound:*'><!-- estimated: 94.544 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,binary,f16_division:vector_scalar:*'><!-- estimated: 46.896 ms -->
-<meta name=variant content='?q=webgpu:shader,execution,expression,binary,f16_division:vector_scalar_compound:*'><!-- estimated: 51.696 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,binary,f16_division:vector_scalar_compound:*'><!-- estimated: 1165.308 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,binary,f16_division:scalar_vector:*'><!-- estimated: 42.108 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,binary,f16_matrix_addition:matrix:inputSource="const";cols=2;rows=2;*'><!-- estimated: 775.164 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,binary,f16_matrix_addition:matrix:inputSource="const";cols=2;rows=3;*'><!-- estimated: 775.164 ms -->
@@ -6411,10 +6411,10 @@
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,cross:f32:inputSource="storage_r";*'><!-- estimated: 664.926 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,cross:f32:inputSource="storage_rw";*'><!-- estimated: 664.926 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,cross:f16:*'><!-- estimated: 64.404 ms -->
-<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,degrees:abstract_float:inputSource="const";*'><!-- estimated: 705.628 ms -->
-<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,degrees:abstract_float:inputSource="uniform";*'><!-- estimated: 705.628 ms -->
-<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,degrees:abstract_float:inputSource="storage_r";*'><!-- estimated: 705.628 ms -->
-<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,degrees:abstract_float:inputSource="storage_rw";*'><!-- estimated: 705.628 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,degrees:abstract_float:inputSource="const";vectorize="_undef_";*'><!-- estimated: 533.052 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,degrees:abstract_float:inputSource="const";vectorize=2;*'><!-- estimated: 533.052 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,degrees:abstract_float:inputSource="const";vectorize=3;*'><!-- estimated: 533.052 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,degrees:abstract_float:inputSource="const";vectorize=4;*'><!-- estimated: 533.052 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,degrees:f32:*'><!-- estimated: 1272.400 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,degrees:f16:*'><!-- estimated: 468.928 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,determinant:abstract_float:*'><!-- estimated: 183.672 ms -->
@@ -6450,10 +6450,13 @@
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,dpdyFine:f32:*'><!-- estimated: 268.896 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp:abstract_float:*'><!-- estimated: 275.360 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp:f32:*'><!-- estimated: 200.912 ms -->
-<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp:f16:*'><!-- estimated: 281.680 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp:f16:inputSource="const";*'><!-- estimated: 541.452 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp:f16:inputSource="uniform";*'><!-- estimated: 541.452 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp:f16:inputSource="storage_r";*'><!-- estimated: 541.452 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp:f16:inputSource="storage_rw";*'><!-- estimated: 541.452 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp2:abstract_float:*'><!-- estimated: 363.280 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp2:f32:*'><!-- estimated: 194.704 ms -->
-<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp2:f16:*'><!-- estimated: 382.528 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,exp2:f16:*'><!-- estimated: 1272.016 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,extractBits:u32:*'><!-- estimated: 125.408 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,extractBits:i32:*'><!-- estimated: 130.000 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,faceForward:abstract_float:*'><!-- estimated: 171.672 ms -->
@@ -6593,8 +6596,11 @@
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,round:abstract_float:*'><!-- estimated: 310.528 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,round:f32:*'><!-- estimated: 198.512 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,round:f16:*'><!-- estimated: 488.144 ms -->
-<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,saturate:abstract_float:*'><!-- estimated: 393.712 ms -->
-<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,saturate:f32:*'><!-- estimated: 199.104 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,saturate:abstract_float:inputSource="const";*'><!-- estimated: 910.428 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,saturate:abstract_float:inputSource="uniform";*'><!-- estimated: 910.428 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,saturate:abstract_float:inputSource="storage_r";*'><!-- estimated: 910.428 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,saturate:abstract_float:inputSource="storage_rw";*'><!-- estimated: 910.428 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,saturate:f32:*'><!-- estimated: 1860.400 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,saturate:f16:*'><!-- estimated: 374.512 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,select:scalar:*'><!-- estimated: 550.560 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,call,builtin,select:vector:*'><!-- estimated: 425.760 ms -->
@@ -6849,13 +6855,24 @@
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,bool_conversion:f16:*'><!-- estimated: 459.360 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,bool_logical:negation:*'><!-- estimated: 102.608 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,f16_arithmetic:negation:*'><!-- estimated: 1881.664 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f16_conversion:bool:*'><!-- estimated: 555.104 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f16_conversion:u32:*'><!-- estimated: 1352.000 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f16_conversion:i32:*'><!-- estimated: 392.912 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f16_conversion:f32:*'><!-- estimated: 494.400 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f16_conversion:f32_mat:*'><!-- estimated: 1361.520 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f16_conversion:f16:*'><!-- estimated: 576.208 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f16_conversion:f16_mat:*'><!-- estimated: 1695.924 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_arithmetic:negation:*'><!-- estimated: 262.400 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:bool:*'><!-- estimated: 114.912 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:u32:*'><!-- estimated: 114.112 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:i32:*'><!-- estimated: 123.216 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:f32:*'><!-- estimated: 120.608 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:f32_mat:*'><!-- estimated: 279.324 ms -->
-<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:f16:*'><!-- estimated: 254.528 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:f16:*'><!-- estimated: 1719.408 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:f16_mat:inputSource="const";*'><!-- estimated: 541.530 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:f16_mat:inputSource="uniform";*'><!-- estimated: 541.530 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:f16_mat:inputSource="storage_r";*'><!-- estimated: 541.530 ms -->
+<meta name=variant content='?q=webgpu:shader,execution,expression,unary,f32_conversion:f16_mat:inputSource="storage_rw";*'><!-- estimated: 541.530 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,i32_arithmetic:negation:*'><!-- estimated: 115.904 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,i32_complement:i32_complement:*'><!-- estimated: 145.200 ms -->
 <meta name=variant content='?q=webgpu:shader,execution,expression,unary,i32_conversion:bool:*'><!-- estimated: 103.312 ms -->
