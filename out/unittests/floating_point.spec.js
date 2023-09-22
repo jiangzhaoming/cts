@@ -3050,44 +3050,73 @@ fn((t) => {
 
 });
 
-g.test('lengthIntervalScalar_f32').
-paramsSubcasesOnly(
+// Expectation interval of 1/inverseSqrt(sum(x[i]^2)) on some special values array x for certain
+// float traits, used as expectation for `length` and `distance`.
+// These cases are hard coded, since the error intervals are difficult to express in a closed
+// human-readable form due to the inherited nature of the errors.
 
-[
-// Some of these are hard coded, since the error intervals are difficult
-// to express in a closed human-readable form due to the inherited nature
-// of the errors.
-//
-// length(0) = kUnboundedBounds, because length uses sqrt, which is defined as 1/inversesqrt
-{ input: 0, expected: kUnboundedBounds },
-{ input: 1.0, expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: -1.0, expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: 0.1, expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
-{ input: -0.1, expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
-{ input: 10.0, expected: [reinterpretU64AsF64(0x4023_ffff_7000_0000n), reinterpretU64AsF64(0x4024_0000_b000_0000n)] }, // ~10
-{ input: -10.0, expected: [reinterpretU64AsF64(0x4023_ffff_7000_0000n), reinterpretU64AsF64(0x4024_0000_b000_0000n)] }, // ~10
+const kRootSumSquareExpectionInterval = {
+  f32: {
+    '[0.1]': [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)], // ~0.1
+    '[1.0]': [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)], // ~1.0
+    '[10]': [reinterpretU64AsF64(0x4023_ffff_7000_0000n), reinterpretU64AsF64(0x4024_0000_b000_0000n)], // ~10
+    '[1.0, 1.0]': [reinterpretU64AsF64(0x3ff6_a09d_b000_0000n), reinterpretU64AsF64(0x3ff6_a09f_1000_0000n)], // ~√2
+    '[1.0, 1.0, 1.0]': [reinterpretU64AsF64(0x3ffb_b67a_1000_0000n), reinterpretU64AsF64(0x3ffb_b67b_b000_0000n)], // ~√3
+    '[1.0, 1.0, 1.0, 1.0]': [reinterpretU64AsF64(0x3fff_ffff_7000_0000n), reinterpretU64AsF64(0x4000_0000_9000_0000n)] // ~2
+  },
+  f16: {
+    '[0.1]': [reinterpretU64AsF64(0x3fb9_7e00_0000_0000n), reinterpretU64AsF64(0x3fb9_b600_0000_0000n)], // ~0.1
+    '[1.0]': [reinterpretU64AsF64(0x3fef_ee00_0000_0000n), reinterpretU64AsF64(0x3ff0_1200_0000_0000n)], // ~1.0
+    '[10]': [reinterpretU64AsF64(0x4023_ea00_0000_0000n), reinterpretU64AsF64(0x4024_1200_0000_0000n)], // ~10
+    '[1.0, 1.0]': [reinterpretU64AsF64(0x3ff6_8a00_0000_0000n), reinterpretU64AsF64(0x3ff6_b600_0000_0000n)], // ~√2
+    '[1.0, 1.0, 1.0]': [reinterpretU64AsF64(0x3ffb_9a00_0000_0000n), reinterpretU64AsF64(0x3ffb_d200_0000_0000n)], // ~√3
+    '[1.0, 1.0, 1.0, 1.0]': [reinterpretU64AsF64(0x3fff_ee00_0000_0000n), reinterpretU64AsF64(0x4000_1200_0000_0000n)] // ~2
+  }
+};
 
-// Subnormal Cases
-{ input: kValue.f32.subnormal.negative.min, expected: kUnboundedBounds },
-{ input: kValue.f32.subnormal.negative.max, expected: kUnboundedBounds },
-{ input: kValue.f32.subnormal.positive.min, expected: kUnboundedBounds },
-{ input: kValue.f32.subnormal.positive.max, expected: kUnboundedBounds },
+g.test('lengthIntervalScalar').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+expandWithParams((p) => {
+  const trait = FP[p.trait];
+  const constants = trait.constants();
 
-// Edge cases
-{ input: kValue.f32.infinity.positive, expected: kUnboundedBounds },
-{ input: kValue.f32.infinity.negative, expected: kUnboundedBounds },
-{ input: kValue.f32.negative.min, expected: kUnboundedBounds },
-{ input: kValue.f32.negative.max, expected: kUnboundedBounds },
-{ input: kValue.f32.positive.min, expected: kUnboundedBounds },
-{ input: kValue.f32.positive.max, expected: kUnboundedBounds }]).
+  return [
+  { input: 1.0, expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: -1.0, expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: 0.1, expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
+  { input: -0.1, expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
+  { input: 10.0, expected: kRootSumSquareExpectionInterval[p.trait]['[10]'] }, // ~10
+  { input: -10.0, expected: kRootSumSquareExpectionInterval[p.trait]['[10]'] }, // ~10
 
+  // length(0) = kUnboundedBounds, because length uses sqrt, which is defined as 1/inversesqrt
+  { input: 0, expected: kUnboundedBounds },
+
+  // Subnormal Cases
+  { input: constants.negative.subnormal.min, expected: kUnboundedBounds },
+  { input: constants.negative.subnormal.max, expected: kUnboundedBounds },
+  { input: constants.positive.subnormal.min, expected: kUnboundedBounds },
+  { input: constants.positive.subnormal.max, expected: kUnboundedBounds },
+
+  // Edge cases
+  { input: constants.positive.infinity, expected: kUnboundedBounds },
+  { input: constants.negative.infinity, expected: kUnboundedBounds },
+  { input: constants.negative.min, expected: kUnboundedBounds },
+  { input: constants.negative.max, expected: kUnboundedBounds },
+  { input: constants.positive.min, expected: kUnboundedBounds },
+  { input: constants.positive.max, expected: kUnboundedBounds }];
+
+})).
 
 fn((t) => {
-  const expected = FP.f32.toInterval(t.params.expected);
-  const got = FP.f32.lengthInterval(t.params.input);
+  const trait = FP[t.params.trait];
+  const expected = trait.toInterval(t.params.expected);
+  const got = trait.lengthInterval(t.params.input);
   t.expect(
   objectEquals(expected, got),
-  `f32.lengthInterval(${t.params.input}) returned ${got}. Expected ${expected}`);
+  `${t.params.trait}.lengthInterval(${t.params.input}) returned ${got}. Expected ${expected}`);
 
 });
 
@@ -3483,13 +3512,19 @@ const kSaturateIntervalCases = {
     kPlusOneULPFunctions['f16'](reinterpretU16AsF16(0x2e66))]
 
   } // ~0.1
+  ],
+  abstract: [
+  {
+    input: 0.1,
+    expected: 0.1
+  } // ~0.1
   ]
 };
 
 g.test('saturateInterval').
 params((u) =>
 u.
-combine('trait', ['f32', 'f16']).
+combine('trait', ['f32', 'f16', 'abstract']).
 beginSubcases().
 expandWithParams((p) => {
   const constants = FP[p.trait].constants();
@@ -4090,53 +4125,58 @@ fn((t) => {
 
 });
 
-g.test('distanceIntervalScalar_f32').
-paramsSubcasesOnly(
+g.test('distanceIntervalScalar').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+expandWithParams((p) => {
+  const trait = FP[p.trait];
+  const constants = trait.constants();
 
-[
-// Some of these are hard coded, since the error intervals are difficult
-// to express in a closed human-readable  form due to the inherited nature
-// of the errors.
-//
-// distance(x, y), where x - y = 0 has an acceptance interval of kUnboundedBounds,
-// because distance(x, y) = length(x - y), and length(0) = kUnboundedBounds
-{ input: [0, 0], expected: kUnboundedBounds },
-{ input: [1.0, 0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [0.0, 1.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [1.0, 1.0], expected: kUnboundedBounds },
-{ input: [-0.0, -1.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [0.0, -1.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [-1.0, -1.0], expected: kUnboundedBounds },
-{ input: [0.1, 0], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
-{ input: [0, 0.1], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
-{ input: [-0.1, 0], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
-{ input: [0, -0.1], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
-{ input: [10.0, 0], expected: [reinterpretU64AsF64(0x4023_ffff_7000_0000n), reinterpretU64AsF64(0x4024_0000_b000_0000n)] }, // ~10
-{ input: [0, 10.0], expected: [reinterpretU64AsF64(0x4023_ffff_7000_0000n), reinterpretU64AsF64(0x4024_0000_b000_0000n)] }, // ~10
-{ input: [-10.0, 0], expected: [reinterpretU64AsF64(0x4023_ffff_7000_0000n), reinterpretU64AsF64(0x4024_0000_b000_0000n)] }, // ~10
-{ input: [0, -10.0], expected: [reinterpretU64AsF64(0x4023_ffff_7000_0000n), reinterpretU64AsF64(0x4024_0000_b000_0000n)] }, // ~10
+  return [
+  { input: [1.0, 0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [0.0, 1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [-0.0, -1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [0.0, -1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [0.1, 0], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
+  { input: [0, 0.1], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
+  { input: [-0.1, 0], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
+  { input: [0, -0.1], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
+  { input: [10.0, 0], expected: kRootSumSquareExpectionInterval[p.trait]['[10]'] }, // ~10
+  { input: [0, 10.0], expected: kRootSumSquareExpectionInterval[p.trait]['[10]'] }, // ~10
+  { input: [-10.0, 0], expected: kRootSumSquareExpectionInterval[p.trait]['[10]'] }, // ~10
+  { input: [0, -10.0], expected: kRootSumSquareExpectionInterval[p.trait]['[10]'] }, // ~10
 
-// Subnormal Cases
-{ input: [kValue.f32.subnormal.negative.min, 0], expected: kUnboundedBounds },
-{ input: [kValue.f32.subnormal.negative.max, 0], expected: kUnboundedBounds },
-{ input: [kValue.f32.subnormal.positive.min, 0], expected: kUnboundedBounds },
-{ input: [kValue.f32.subnormal.positive.max, 0], expected: kUnboundedBounds },
+  // distance(x, y), where x - y = 0 has an acceptance interval of kUnboundedBounds,
+  // because distance(x, y) = length(x - y), and length(0) = kUnboundedBounds
+  { input: [0, 0], expected: kUnboundedBounds },
+  { input: [1.0, 1.0], expected: kUnboundedBounds },
+  { input: [-1.0, -1.0], expected: kUnboundedBounds },
 
-// Edge cases
-{ input: [kValue.f32.infinity.positive, 0], expected: kUnboundedBounds },
-{ input: [kValue.f32.infinity.negative, 0], expected: kUnboundedBounds },
-{ input: [kValue.f32.negative.min, 0], expected: kUnboundedBounds },
-{ input: [kValue.f32.negative.max, 0], expected: kUnboundedBounds },
-{ input: [kValue.f32.positive.min, 0], expected: kUnboundedBounds },
-{ input: [kValue.f32.positive.max, 0], expected: kUnboundedBounds }]).
+  // Subnormal Cases
+  { input: [constants.negative.subnormal.min, 0], expected: kUnboundedBounds },
+  { input: [constants.negative.subnormal.max, 0], expected: kUnboundedBounds },
+  { input: [constants.positive.subnormal.min, 0], expected: kUnboundedBounds },
+  { input: [constants.positive.subnormal.max, 0], expected: kUnboundedBounds },
 
+  // Edge cases
+  { input: [constants.positive.infinity, 0], expected: kUnboundedBounds },
+  { input: [constants.negative.infinity, 0], expected: kUnboundedBounds },
+  { input: [constants.negative.min, 0], expected: kUnboundedBounds },
+  { input: [constants.negative.max, 0], expected: kUnboundedBounds },
+  { input: [constants.positive.min, 0], expected: kUnboundedBounds },
+  { input: [constants.positive.max, 0], expected: kUnboundedBounds }];
+
+})).
 
 fn((t) => {
-  const expected = FP.f32.toInterval(t.params.expected);
-  const got = FP.f32.distanceInterval(...t.params.input);
+  const trait = FP[t.params.trait];
+  const expected = trait.toInterval(t.params.expected);
+  const got = trait.distanceInterval(...t.params.input);
   t.expect(
   objectEquals(expected, got),
-  `f32.distanceInterval(${t.params.input[0]}, ${t.params.input[1]}) returned ${got}. Expected ${expected}`);
+  `${t.params.trait}.distanceInterval(${t.params.input[0]}, ${t.params.input[1]}) returned ${got}. Expected ${expected}`);
 
 });
 
@@ -4309,13 +4349,21 @@ const kMaxInterval64BitsCases = {
   { input: [0.1, -0.1], expected: [reinterpretU16AsF16(0x2e66), kPlusOneULPFunctions['f16'](reinterpretU16AsF16(0x2e66))] }, // ~0.1
   { input: [-0.1, 0.1], expected: [reinterpretU16AsF16(0x2e66), kPlusOneULPFunctions['f16'](reinterpretU16AsF16(0x2e66))] }, // ~0.1
   { input: [-0.1, -0.1], expected: [reinterpretU16AsF16(0xae67), kPlusOneULPFunctions['f16'](reinterpretU16AsF16(0xae67))] } // ~-0.1
-  ]
+  ],
+  abstract: [
+  { input: [0.1, 0], expected: 0.1 },
+  { input: [0, 0.1], expected: 0.1 },
+  { input: [0.1, 0.1], expected: 0.1 },
+  { input: [0.1, -0.1], expected: 0.1 },
+  { input: [-0.1, 0.1], expected: 0.1 },
+  { input: [-0.1, -0.1], expected: -0.1 }]
+
 };
 
 g.test('maxInterval').
 params((u) =>
 u.
-combine('trait', ['f32', 'f16']).
+combine('trait', ['f32', 'f16', 'abstract']).
 beginSubcases().
 expandWithParams((p) => {
   const trait = FP[p.trait];
@@ -4392,13 +4440,21 @@ const kMinInterval64BitsCases = {
   { input: [0.1, -0.1], expected: [reinterpretU16AsF16(0xae67), kPlusOneULPFunctions['f16'](reinterpretU16AsF16(0xae67))] }, // ~-0.1
   { input: [-0.1, 0.1], expected: [reinterpretU16AsF16(0xae67), kPlusOneULPFunctions['f16'](reinterpretU16AsF16(0xae67))] }, // ~-0.1
   { input: [-0.1, -0.1], expected: [reinterpretU16AsF16(0xae67), kPlusOneULPFunctions['f16'](reinterpretU16AsF16(0xae67))] } // ~-0.1
-  ]
+  ],
+  abstract: [
+  { input: [-0.1, 0], expected: -0.1 },
+  { input: [0, -0.1], expected: -0.1 },
+  { input: [0.1, 0.1], expected: 0.1 },
+  { input: [0.1, -0.1], expected: -0.1 },
+  { input: [-0.1, 0.1], expected: -0.1 },
+  { input: [-0.1, -0.1], expected: -0.1 }]
+
 };
 
 g.test('minInterval').
 params((u) =>
 u.
-combine('trait', ['f32', 'f16']).
+combine('trait', ['f32', 'f16', 'abstract']).
 beginSubcases().
 expandWithParams((p) => {
   const trait = FP[p.trait];
@@ -4890,7 +4946,7 @@ fn((t) => {
 g.test('clampMedianInterval').
 params((u) =>
 u.
-combine('trait', ['f32', 'f16']).
+combine('trait', ['f32', 'f16', 'abstract']).
 beginSubcases().
 expandWithParams((p) => {
   const trait = FP[p.trait];
@@ -4948,7 +5004,7 @@ fn((t) => {
 g.test('clampMinMaxInterval').
 params((u) =>
 u.
-combine('trait', ['f32', 'f16']).
+combine('trait', ['f32', 'f16', 'abstract']).
 beginSubcases().
 expandWithParams((p) => {
   const trait = FP[p.trait];
@@ -5506,53 +5562,57 @@ fn((t) => {
 
 
 
-g.test('lengthIntervalVector_f32').
-paramsSubcasesOnly(
+g.test('lengthIntervalVector').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+expandWithParams((p) => {
+  const trait = FP[p.trait];
+  const constants = trait.constants();
 
-[
-// Some of these are hard coded, since the error intervals are difficult
-// to express in a closed human-readable form due to the inherited nature
-// of the errors.
+  return [
+  // vec2
+  { input: [1.0, 0.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [0.0, 1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [1.0, 1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0]'] }, // ~√2
+  { input: [-1.0, -1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0]'] }, // ~√2
+  { input: [-1.0, 1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0]'] }, // ~√2
+  { input: [0.1, 0.0], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
 
-// vec2
-{ input: [1.0, 0.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [0.0, 1.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [1.0, 1.0], expected: [reinterpretU64AsF64(0x3ff6_a09d_b000_0000n), reinterpretU64AsF64(0x3ff6_a09f_1000_0000n)] }, // ~√2
-{ input: [-1.0, -1.0], expected: [reinterpretU64AsF64(0x3ff6_a09d_b000_0000n), reinterpretU64AsF64(0x3ff6_a09f_1000_0000n)] }, // ~√2
-{ input: [-1.0, 1.0], expected: [reinterpretU64AsF64(0x3ff6_a09d_b000_0000n), reinterpretU64AsF64(0x3ff6_a09f_1000_0000n)] }, // ~√2
-{ input: [0.1, 0.0], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
+  // vec3
+  { input: [1.0, 0.0, 0.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [0.0, 1.0, 0.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [0.0, 0.0, 1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [1.0, 1.0, 1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0]'] }, // ~√3
+  { input: [-1.0, -1.0, -1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0]'] }, // ~√3
+  { input: [1.0, -1.0, -1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0]'] }, // ~√3
+  { input: [0.1, 0.0, 0.0], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
 
-// vec3
-{ input: [1.0, 0.0, 0.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [0.0, 1.0, 0.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [0.0, 0.0, 1.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [1.0, 1.0, 1.0], expected: [reinterpretU64AsF64(0x3ffb_b67a_1000_0000n), reinterpretU64AsF64(0x3ffb_b67b_b000_0000n)] }, // ~√3
-{ input: [-1.0, -1.0, -1.0], expected: [reinterpretU64AsF64(0x3ffb_b67a_1000_0000n), reinterpretU64AsF64(0x3ffb_b67b_b000_0000n)] }, // ~√3
-{ input: [1.0, -1.0, -1.0], expected: [reinterpretU64AsF64(0x3ffb_b67a_1000_0000n), reinterpretU64AsF64(0x3ffb_b67b_b000_0000n)] }, // ~√3
-{ input: [0.1, 0.0, 0.0], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
+  // vec4
+  { input: [1.0, 0.0, 0.0, 0.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [0.0, 1.0, 0.0, 0.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [0.0, 0.0, 1.0, 0.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [0.0, 0.0, 0.0, 1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [1.0, 1.0, 1.0, 1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0, 1.0]'] }, // ~2
+  { input: [-1.0, -1.0, -1.0, -1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0, 1.0]'] }, // ~2
+  { input: [-1.0, 1.0, -1.0, 1.0], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0, 1.0]'] }, // ~2
+  { input: [0.1, 0.0, 0.0, 0.0], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
 
-// vec4
-{ input: [1.0, 0.0, 0.0, 0.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [0.0, 1.0, 0.0, 0.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [0.0, 0.0, 1.0, 0.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [0.0, 0.0, 0.0, 1.0], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [1.0, 1.0, 1.0, 1.0], expected: [reinterpretU64AsF64(0x3fff_ffff_7000_0000n), reinterpretU64AsF64(0x4000_0000_9000_0000n)] }, // ~2
-{ input: [-1.0, -1.0, -1.0, -1.0], expected: [reinterpretU64AsF64(0x3fff_ffff_7000_0000n), reinterpretU64AsF64(0x4000_0000_9000_0000n)] }, // ~2
-{ input: [-1.0, 1.0, -1.0, 1.0], expected: [reinterpretU64AsF64(0x3fff_ffff_7000_0000n), reinterpretU64AsF64(0x4000_0000_9000_0000n)] }, // ~2
-{ input: [0.1, 0.0, 0.0, 0.0], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
+  // Test that dot going OOB bounds in the intermediate calculations propagates
+  { input: [constants.positive.nearest_max, constants.positive.max, constants.negative.min], expected: kUnboundedBounds },
+  { input: [constants.positive.max, constants.positive.nearest_max, constants.negative.min], expected: kUnboundedBounds },
+  { input: [constants.negative.min, constants.positive.max, constants.positive.nearest_max], expected: kUnboundedBounds }];
 
-// Test that dot going OOB bounds in the intermediate calculations propagates
-{ input: [kValue.f32.positive.nearest_max, kValue.f32.positive.max, kValue.f32.negative.min], expected: kUnboundedBounds },
-{ input: [kValue.f32.positive.max, kValue.f32.positive.nearest_max, kValue.f32.negative.min], expected: kUnboundedBounds },
-{ input: [kValue.f32.negative.min, kValue.f32.positive.max, kValue.f32.positive.nearest_max], expected: kUnboundedBounds }]).
-
+})).
 
 fn((t) => {
-  const expected = FP.f32.toInterval(t.params.expected);
-  const got = FP.f32.lengthInterval(t.params.input);
+  const trait = FP[t.params.trait];
+  const expected = trait.toInterval(t.params.expected);
+  const got = trait.lengthInterval(t.params.input);
   t.expect(
   objectEquals(expected, got),
-  `f32.lengthInterval([${t.params.input}]) returned ${got}. Expected ${expected}`);
+  `${t.params.trait}.lengthInterval([${t.params.input}]) returned ${got}. Expected ${expected}`);
 
 });
 
@@ -5561,65 +5621,67 @@ fn((t) => {
 
 
 
-g.test('distanceIntervalVector_f32').
-paramsSubcasesOnly(
+g.test('distanceIntervalVector').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16']).
+beginSubcases().
+expandWithParams((p) => {
 
-[
-// Some of these are hard coded, since the error intervals are difficult
-// to express in a closed human-readable form due to the inherited nature
-// of the errors.
-//
-// distance(x, y), where x - y = 0 has an acceptance interval of kUnboundedBounds,
-// because distance(x, y) = length(x - y), and length(0) = kUnboundedBounds
+  return [
+  // distance(x, y), where x - y = 0 has an acceptance interval of kUnboundedBounds,
+  // because distance(x, y) = length(x - y), and length(0) = kUnboundedBounds.
 
-// vec2
-{ input: [[1.0, 0.0], [1.0, 0.0]], expected: kUnboundedBounds },
-{ input: [[1.0, 0.0], [0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0], [1.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[-1.0, 0.0], [0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0], [-1.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 1.0], [-1.0, 0.0]], expected: [reinterpretU64AsF64(0x3ff6_a09d_b000_0000n), reinterpretU64AsF64(0x3ff6_a09f_1000_0000n)] }, // ~√2
-{ input: [[0.1, 0.0], [0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
+  // vec2
+  { input: [[1.0, 0.0], [1.0, 0.0]], expected: kUnboundedBounds },
+  { input: [[1.0, 0.0], [0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0], [1.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[-1.0, 0.0], [0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0], [-1.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 1.0], [-1.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0]'] }, // ~√2
+  { input: [[0.1, 0.0], [0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
 
-// vec3
-{ input: [[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: kUnboundedBounds },
-{ input: [[1.0, 0.0, 0.0], [0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 1.0, 0.0], [0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0, 1.0], [0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3ffb_b67a_1000_0000n), reinterpretU64AsF64(0x3ffb_b67b_b000_0000n)] }, // ~√3
-{ input: [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]], expected: [reinterpretU64AsF64(0x3ffb_b67a_1000_0000n), reinterpretU64AsF64(0x3ffb_b67b_b000_0000n)] }, // ~√3
-{ input: [[-1.0, -1.0, -1.0], [0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3ffb_b67a_1000_0000n), reinterpretU64AsF64(0x3ffb_b67b_b000_0000n)] }, // ~√3
-{ input: [[0.0, 0.0, 0.0], [-1.0, -1.0, -1.0]], expected: [reinterpretU64AsF64(0x3ffb_b67a_1000_0000n), reinterpretU64AsF64(0x3ffb_b67b_b000_0000n)] }, // ~√3
-{ input: [[0.1, 0.0, 0.0], [0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
-{ input: [[0.0, 0.0, 0.0], [0.1, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
+  // vec3
+  { input: [[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: kUnboundedBounds },
+  { input: [[1.0, 0.0, 0.0], [0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 1.0, 0.0], [0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0, 1.0], [0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0]'] }, // ~√3
+  { input: [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0]'] }, // ~√3
+  { input: [[-1.0, -1.0, -1.0], [0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0]'] }, // ~√3
+  { input: [[0.0, 0.0, 0.0], [-1.0, -1.0, -1.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0]'] }, // ~√3
+  { input: [[0.1, 0.0, 0.0], [0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
+  { input: [[0.0, 0.0, 0.0], [0.1, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
 
-// vec4
-{ input: [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], expected: kUnboundedBounds },
-{ input: [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]], expected: [reinterpretU64AsF64(0x3fef_ffff_7000_0000n), reinterpretU64AsF64(0x3ff0_0000_9000_0000n)] }, // ~1
-{ input: [[1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fff_ffff_7000_0000n), reinterpretU64AsF64(0x4000_0000_9000_0000n)] }, // ~2
-{ input: [[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]], expected: [reinterpretU64AsF64(0x3fff_ffff_7000_0000n), reinterpretU64AsF64(0x4000_0000_9000_0000n)] }, // ~2
-{ input: [[-1.0, 1.0, -1.0, 1.0], [0.0, 0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fff_ffff_7000_0000n), reinterpretU64AsF64(0x4000_0000_9000_0000n)] }, // ~2
-{ input: [[0.0, 0.0, 0.0, 0.0], [1.0, -1.0, 1.0, -1.0]], expected: [reinterpretU64AsF64(0x3fff_ffff_7000_0000n), reinterpretU64AsF64(0x4000_0000_9000_0000n)] }, // ~2
-{ input: [[0.1, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] }, // ~0.1
-{ input: [[0.0, 0.0, 0.0, 0.0], [0.1, 0.0, 0.0, 0.0]], expected: [reinterpretU64AsF64(0x3fb9_9998_9000_0000n), reinterpretU64AsF64(0x3fb9_999a_7000_0000n)] } // ~0.1
-]).
+  // vec4
+  { input: [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], expected: kUnboundedBounds },
+  { input: [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0]'] }, // ~1
+  { input: [[1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0, 1.0]'] }, // ~2
+  { input: [[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0, 1.0]'] }, // ~2
+  { input: [[-1.0, 1.0, -1.0, 1.0], [0.0, 0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0, 1.0]'] }, // ~2
+  { input: [[0.0, 0.0, 0.0, 0.0], [1.0, -1.0, 1.0, -1.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[1.0, 1.0, 1.0, 1.0]'] }, // ~2
+  { input: [[0.1, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] }, // ~0.1
+  { input: [[0.0, 0.0, 0.0, 0.0], [0.1, 0.0, 0.0, 0.0]], expected: kRootSumSquareExpectionInterval[p.trait]['[0.1]'] } // ~0.1
+  ];
+})).
 
 fn((t) => {
-  const expected = FP.f32.toInterval(t.params.expected);
-  const got = FP.f32.distanceInterval(...t.params.input);
+  const trait = FP[t.params.trait];
+  const expected = trait.toInterval(t.params.expected);
+  const got = trait.distanceInterval(...t.params.input);
   t.expect(
   objectEquals(expected, got),
-  `f32.distanceInterval([${t.params.input[0]}, ${t.params.input[1]}]) returned ${got}. Expected ${expected}`);
+  `${t.params.trait}.lengthInterval([${t.params.input[0]}, ${t.params.input[1]}]) returned ${got}. Expected ${expected}`);
 
 });
 
@@ -5762,45 +5824,106 @@ fn((t) => {
 
 
 
-g.test('crossInterval_f32').
-paramsSubcasesOnly(
 
-[
-// parallel vectors, AXB == 0
-{ input: [[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: [0.0, 0.0, 0.0] },
-{ input: [[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]], expected: [0.0, 0.0, 0.0] },
-{ input: [[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]], expected: [0.0, 0.0, 0.0] },
-{ input: [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], expected: [0.0, 0.0, 0.0] },
-{ input: [[-1.0, -1.0, -1.0], [-1.0, -1.0, -1.0]], expected: [0.0, 0.0, 0.0] },
-{ input: [[0.1, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: [0.0, 0.0, 0.0] },
-{ input: [[kValue.f32.subnormal.positive.max, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: [0.0, 0.0, 0.0] },
+const kCrossIntervalCases = {
+  f32: [
+  { input: [
+    [kValue.f32.subnormal.positive.max, kValue.f32.subnormal.negative.max, kValue.f32.subnormal.negative.min],
+    [kValue.f32.subnormal.negative.min, kValue.f32.subnormal.positive.min, kValue.f32.subnormal.negative.max]],
 
-// non-parallel vectors, AXB != 0
-// f32 normals
-{ input: [[1.0, -1.0, -1.0], [-1.0, 1.0, -1.0]], expected: [2.0, 2.0, 0.0] },
-{ input: [[1.0, 2, 3], [1.0, 5.0, 7.0]], expected: [-1, -4, 3] },
+    expected: [
+    [0.0, reinterpretU32AsF32(0x00000002)], // ~0
+    [0.0, reinterpretU32AsF32(0x00000002)], // ~0
+    [kValue.f32.subnormal.negative.max, kValue.f32.subnormal.positive.min] // ~0
+    ]
+  },
+  { input: [
+    [0.1, -0.1, -0.1],
+    [-0.1, 0.1, -0.1]],
 
-// f64 normals
-{ input: [[0.1, -0.1, -0.1], [-0.1, 0.1, -0.1]],
-  expected: [[reinterpretU32AsF32(0x3ca3d708), reinterpretU32AsF32(0x3ca3d70b)], // ~0.02
-  [reinterpretU32AsF32(0x3ca3d708), reinterpretU32AsF32(0x3ca3d70b)], // ~0.02
-  [reinterpretU32AsF32(0xb1400000), reinterpretU32AsF32(0x31400000)]] }, // ~0
+    expected: [
+    [reinterpretU32AsF32(0x3ca3d708), reinterpretU32AsF32(0x3ca3d70b)], // ~0.02
+    [reinterpretU32AsF32(0x3ca3d708), reinterpretU32AsF32(0x3ca3d70b)], // ~0.02
+    [reinterpretU32AsF32(0xb1400000), reinterpretU32AsF32(0x31400000)] // ~0
+    ]
+  }],
 
-// f32 subnormals
-{ input: [[kValue.f32.subnormal.positive.max, kValue.f32.subnormal.negative.max, kValue.f32.subnormal.negative.min],
-  [kValue.f32.subnormal.negative.min, kValue.f32.subnormal.positive.min, kValue.f32.subnormal.negative.max]],
-  expected: [[0.0, reinterpretU32AsF32(0x00000002)], // ~0
-  [0.0, reinterpretU32AsF32(0x00000002)], // ~0
-  [reinterpretU32AsF32(0x80000001), reinterpretU32AsF32(0x00000001)]] } // ~0
-]).
+  f16: [
+  { input: [
+    [kValue.f16.subnormal.positive.max, kValue.f16.subnormal.negative.max, kValue.f16.subnormal.negative.min],
+    [kValue.f16.subnormal.negative.min, kValue.f16.subnormal.positive.min, kValue.f16.subnormal.negative.max]],
+
+    expected: [
+    [0.0, reinterpretU16AsF16(0x0002)], // ~0
+    [0.0, reinterpretU16AsF16(0x0002)], // ~0
+    [kValue.f16.subnormal.negative.max, kValue.f16.subnormal.positive.min] // ~0
+    ]
+  },
+  { input: [
+    [0.1, -0.1, -0.1],
+    [-0.1, 0.1, -0.1]],
+
+    expected: [
+    [reinterpretU16AsF16(0x251e), reinterpretU16AsF16(0x2520)], // ~0.02
+    [reinterpretU16AsF16(0x251e), reinterpretU16AsF16(0x2520)], // ~0.02
+    [reinterpretU16AsF16(0x8100), reinterpretU16AsF16(0x0100)] // ~0
+    ]
+  }],
+
+  abstract: [
+  { input: [
+    [kValue.f64.subnormal.positive.max, kValue.f64.subnormal.negative.max, kValue.f64.subnormal.negative.min],
+    [kValue.f64.subnormal.negative.min, kValue.f64.subnormal.positive.min, kValue.f64.subnormal.negative.max]],
+
+    expected: [0.0, 0.0, 0.0]
+  },
+  { input: [
+    [0.1, -0.1, -0.1],
+    [-0.1, 0.1, -0.1]],
+
+    expected: [
+    reinterpretU64AsF64(0x3f94_7ae1_47ae_147cn), // ~0.02
+    reinterpretU64AsF64(0x3f94_7ae1_47ae_147cn), // ~0.02
+    0.0]
+
+  }]
+
+};
+
+g.test('crossInterval').
+params((u) =>
+u.
+combine('trait', ['f32', 'f16', 'abstract']).
+beginSubcases().
+expandWithParams((p) => {
+  const trait = FP[p.trait];
+  const constants = trait.constants();
+
+  return [
+  // parallel vectors, AXB == 0
+  { input: [[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: [0.0, 0.0, 0.0] },
+  { input: [[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]], expected: [0.0, 0.0, 0.0] },
+  { input: [[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]], expected: [0.0, 0.0, 0.0] },
+  { input: [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], expected: [0.0, 0.0, 0.0] },
+  { input: [[-1.0, -1.0, -1.0], [-1.0, -1.0, -1.0]], expected: [0.0, 0.0, 0.0] },
+  { input: [[0.1, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: [0.0, 0.0, 0.0] },
+  { input: [[constants.positive.subnormal.max, 0.0, 0.0], [1.0, 0.0, 0.0]], expected: [0.0, 0.0, 0.0] },
+
+  // non-parallel vectors, AXB != 0
+  { input: [[1.0, -1.0, -1.0], [-1.0, 1.0, -1.0]], expected: [2.0, 2.0, 0.0] },
+  { input: [[1.0, 2, 3], [1.0, 5.0, 7.0]], expected: [-1, -4, 3] },
+  ...kCrossIntervalCases[p.trait]];
+
+})).
 
 fn((t) => {
   const [x, y] = t.params.input;
-  const expected = FP.f32.toVector(t.params.expected);
-  const got = FP.f32.crossInterval(x, y);
+  const trait = FP[t.params.trait];
+  const expected = trait.toVector(t.params.expected);
+  const got = trait.crossInterval(x, y);
   t.expect(
   objectEquals(expected, got),
-  `f32.crossInterval([${x}], [${y}]) returned ${got}. Expected ${expected}`);
+  `${t.params.trait}.crossInterval([${x}], [${y}]) returned ${got}. Expected ${expected}`);
 
 });
 
