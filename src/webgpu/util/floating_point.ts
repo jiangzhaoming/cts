@@ -3485,37 +3485,52 @@ export abstract class FPTraits {
   /** Calculate an acceptance interval of inverseSqrt(x) */
   public abstract readonly inverseSqrtInterval: (n: number | FPInterval) => FPInterval;
 
-  // This op should be implemented differently for f32 and f16.
   private readonly LdexpIntervalOp: ScalarPairToIntervalOp = {
-    impl: this.limitScalarPairToIntervalDomain(
-      // Implementing SPIR-V's more restrictive domain until
-      // https://github.com/gpuweb/gpuweb/issues/3134 is resolved
-      {
-        x: [this.toInterval([kValue.f32.negative.min, kValue.f32.positive.max])],
-        y: [this.toInterval([-126, 128])],
-      },
-      (e1: number, e2: number): FPInterval => {
-        // Though the spec says the result of ldexp(e1, e2) = e1 * 2 ^ e2, the
-        // accuracy is listed as correctly rounded to the true value, so the
-        // inheritance framework does not need to be invoked to determine
-        // bounds.
-        // Instead, the value at a higher precision is calculated and passed to
-        // correctlyRoundedInterval.
-        const result = e1 * 2 ** e2;
-        if (Number.isNaN(result)) {
-          // Overflowed TS's number type, so definitely out of bounds for f32
-          return this.constants().unboundedInterval;
-        }
-        return this.correctlyRoundedInterval(result);
+    impl: (e1: number, e2: number) => {
+      assert(this.kind === 'f32' || this.kind === 'f16');
+      assert(Number.isInteger(e2), 'the second param of ldexp must be an integer');
+      const bias = this.kind === 'f32' ? 127 : 15;
+      // Spec explicitly calls indeterminate value if e2 > bias + 1
+      if (e2 > bias + 1) {
+        return this.constants().unboundedInterval;
       }
-    ),
+      // The spec says the result of ldexp(e1, e2) = e1 * 2 ^ e2, and the accuracy is correctly
+      // rounded to the true value, so the inheritance framework does not need to be invoked to
+      // determine bounds.
+      // Instead, the value at a higher precision is calculated and passed to
+      // correctlyRoundedInterval.
+      const result = e1 * 2 ** e2;
+      if (!Number.isFinite(result)) {
+        // Overflowed TS's number type, so definitely out of bounds for f32/f16
+        return this.constants().unboundedInterval;
+      }
+      // The result may be zero if e2 + bias <= 0, but we can't simply span the interval to 0.0.
+      // For example, for f32 input e1 = 2**120 and e2 = -130, e2 + bias = -3 <= 0, but
+      // e1 * 2 ** e2 = 2**-10, so the valid result is 2**-10 or 0.0, instead of [0.0, 2**-10].
+      // Always return the correctly-rounded interval, and special examination should be taken when
+      // using the result.
+      return this.correctlyRoundedInterval(result);
+    },
   };
 
   protected ldexpIntervalImpl(e1: number, e2: number): FPInterval {
-    return this.roundAndFlushScalarPairToInterval(e1, e2, this.LdexpIntervalOp);
+    // Only round and flush e1, as e2 is of integer type (i32 or abstract integer) and should be
+    // precise.
+    return this.roundAndFlushScalarToInterval(e1, {
+      impl: (e1: number) => this.LdexpIntervalOp.impl(e1, e2),
+    });
   }
 
-  /** Calculate an acceptance interval of ldexp(e1, e2) */
+  /**
+   * Calculate an acceptance interval of ldexp(e1, e2), where e2 is integer
+   *
+   * Spec indicate that the result may be zero if e2 + bias <= 0, no matter how large
+   * was e1 * 2 ** e2, i.e. the actual valid result is correctlyRounded(e1 * 2 ** e2) or 0.0, if
+   * e2 + bias <= 0. Such discontinious flush-to-zero behavior is hard to be expressed using
+   * FPInterval, therefore in the situation of e2 + bias <= 0 the returned interval would be just
+   * correctlyRounded(e1 * 2 ** e2), and special examination should be taken when using the result.
+   *
+   */
   public abstract readonly ldexpInterval: (e1: number, e2: number) => FPInterval;
 
   private readonly LengthIntervalScalarOp: ScalarToIntervalOp = {
@@ -3908,7 +3923,7 @@ export abstract class FPTraits {
 
   /**
    * refract is a singular function in the sense that it is the only builtin that
-   * takes in (FPVector, FPVector, F32) and returns FPVector and is basically
+   * takes in (FPVector, FPVector, F32/F16) and returns FPVector and is basically
    * defined in terms of other functions.
    *
    * Instead of implementing all the framework code to integrate it with its
@@ -4968,7 +4983,7 @@ class FPAbstractTraits extends FPTraits {
   public readonly exp2Interval = this.unimplementedScalarToInterval.bind(this, 'exp2Interval');
   public readonly faceForwardIntervals = this.unimplementedFaceForward.bind(this);
   public readonly floorInterval = this.unimplementedScalarToInterval.bind(this, 'floorInterval');
-  public readonly fmaInterval = this.unimplementedScalarTripleToInterval.bind(this, 'fmaInterval');
+  public readonly fmaInterval = this.fmaIntervalImpl.bind(this);
   public readonly fractInterval = this.unimplementedScalarToInterval.bind(this, 'fractInterval');
   public readonly inverseSqrtInterval = this.unimplementedScalarToInterval.bind(
     this,
@@ -5261,48 +5276,36 @@ class F16Traits extends FPTraits {
   // Framework - API - Overrides
   public readonly absInterval = this.absIntervalImpl.bind(this);
   public readonly acosInterval = this.acosIntervalImpl.bind(this);
-  public readonly acoshAlternativeInterval = this.unimplementedScalarToInterval.bind(
-    this,
-    'acoshAlternativeInterval'
-  );
-  public readonly acoshPrimaryInterval = this.unimplementedScalarToInterval.bind(
-    this,
-    'acoshPrimaryInterval'
-  );
+  public readonly acoshAlternativeInterval = this.acoshAlternativeIntervalImpl.bind(this);
+  public readonly acoshPrimaryInterval = this.acoshPrimaryIntervalImpl.bind(this);
   public readonly acoshIntervals = [this.acoshAlternativeInterval, this.acoshPrimaryInterval];
   public readonly additionInterval = this.additionIntervalImpl.bind(this);
   public readonly additionMatrixMatrixInterval = this.additionMatrixMatrixIntervalImpl.bind(this);
   public readonly asinInterval = this.asinIntervalImpl.bind(this);
-  public readonly asinhInterval = this.unimplementedScalarToInterval.bind(this, 'asinhInterval');
+  public readonly asinhInterval = this.asinhIntervalImpl.bind(this);
   public readonly atanInterval = this.atanIntervalImpl.bind(this);
   public readonly atan2Interval = this.atan2IntervalImpl.bind(this);
-  public readonly atanhInterval = this.unimplementedScalarToInterval.bind(this, 'atanhInterval');
+  public readonly atanhInterval = this.atanhIntervalImpl.bind(this);
   public readonly ceilInterval = this.ceilIntervalImpl.bind(this);
   public readonly clampMedianInterval = this.clampMedianIntervalImpl.bind(this);
   public readonly clampMinMaxInterval = this.clampMinMaxIntervalImpl.bind(this);
   public readonly clampIntervals = [this.clampMedianInterval, this.clampMinMaxInterval];
   public readonly cosInterval = this.cosIntervalImpl.bind(this);
-  public readonly coshInterval = this.unimplementedScalarToInterval.bind(this, 'coshInterval');
+  public readonly coshInterval = this.coshIntervalImpl.bind(this);
   public readonly crossInterval = this.crossIntervalImpl.bind(this);
   public readonly degreesInterval = this.degreesIntervalImpl.bind(this);
-  public readonly determinantInterval = this.unimplementedMatrixToInterval.bind(
-    this,
-    'determinantInterval'
-  );
+  public readonly determinantInterval = this.determinantIntervalImpl.bind(this);
   public readonly distanceInterval = this.distanceIntervalImpl.bind(this);
   public readonly divisionInterval = this.divisionIntervalImpl.bind(this);
   public readonly dotInterval = this.dotIntervalImpl.bind(this);
   public readonly expInterval = this.expIntervalImpl.bind(this);
   public readonly exp2Interval = this.exp2IntervalImpl.bind(this);
-  public readonly faceForwardIntervals = this.unimplementedFaceForward.bind(this);
+  public readonly faceForwardIntervals = this.faceForwardIntervalsImpl.bind(this);
   public readonly floorInterval = this.floorIntervalImpl.bind(this);
   public readonly fmaInterval = this.fmaIntervalImpl.bind(this);
-  public readonly fractInterval = this.unimplementedScalarToInterval.bind(this, 'fractInterval');
+  public readonly fractInterval = this.fractIntervalImpl.bind(this);
   public readonly inverseSqrtInterval = this.inverseSqrtIntervalImpl.bind(this);
-  public readonly ldexpInterval = this.unimplementedScalarPairToInterval.bind(
-    this,
-    'ldexpInterval'
-  );
+  public readonly ldexpInterval = this.ldexpIntervalImpl.bind(this);
   public readonly lengthInterval = this.lengthIntervalImpl.bind(this);
   public readonly logInterval = this.logIntervalImpl.bind(this);
   public readonly log2Interval = this.log2IntervalImpl.bind(this);
@@ -5333,17 +5336,14 @@ class F16Traits extends FPTraits {
   public readonly powInterval = this.powIntervalImpl.bind(this);
   public readonly quantizeToF16Interval = this.quantizeToF16IntervalNotAvailable.bind(this);
   public readonly radiansInterval = this.radiansIntervalImpl.bind(this);
-  public readonly reflectInterval = this.unimplementedVectorPairToVector.bind(
-    this,
-    'reflectInterval'
-  );
-  public readonly refractInterval = this.unimplementedRefract.bind(this);
+  public readonly reflectInterval = this.reflectIntervalImpl.bind(this);
+  public readonly refractInterval = this.refractIntervalImpl.bind(this);
   public readonly remainderInterval = this.remainderIntervalImpl.bind(this);
   public readonly roundInterval = this.roundIntervalImpl.bind(this);
   public readonly saturateInterval = this.saturateIntervalImpl.bind(this);
   public readonly signInterval = this.signIntervalImpl.bind(this);
   public readonly sinInterval = this.sinIntervalImpl.bind(this);
-  public readonly sinhInterval = this.unimplementedScalarToInterval.bind(this, 'sinhInterval');
+  public readonly sinhInterval = this.sinhIntervalImpl.bind(this);
   public readonly smoothStepInterval = this.smoothStepIntervalImpl.bind(this);
   public readonly sqrtInterval = this.sqrtIntervalImpl.bind(this);
   public readonly stepInterval = this.stepIntervalImpl.bind(this);
@@ -5352,7 +5352,7 @@ class F16Traits extends FPTraits {
     this
   );
   public readonly tanInterval = this.tanIntervalImpl.bind(this);
-  public readonly tanhInterval = this.unimplementedScalarToInterval.bind(this, 'tanhInterval');
+  public readonly tanhInterval = this.tanhIntervalImpl.bind(this);
   public readonly transposeInterval = this.transposeIntervalImpl.bind(this);
   public readonly truncInterval = this.truncIntervalImpl.bind(this);
 
