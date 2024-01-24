@@ -22,12 +22,9 @@ import {
   correctlyRoundedF32,
   FlushMode,
   frexp,
-  fullF16Range,
-  fullF32Range,
+  scalarF16Range,
+  scalarF32Range,
   fullI32Range,
-  reinterpretU16AsF16,
-  reinterpretU32AsF32,
-  reinterpretU64AsF64,
   lerp,
   linearRange,
   nextAfterF16,
@@ -40,6 +37,11 @@ import {
   lerpBigInt,
   linearRangeBigInt,
 } from '../webgpu/util/math.js';
+import {
+  reinterpretU16AsF16,
+  reinterpretU32AsF32,
+  reinterpretU64AsF64,
+} from '../webgpu/util/reinterpret.js';
 
 import { UnitTest } from './unit_test.js';
 
@@ -70,8 +72,8 @@ function withinOneULPF32(got: number, expected: number, mode: FlushMode): boolea
  *              FTZ occur during comparison
  **/
 function compareArrayOfNumbersF32(
-  got: Array<number>,
-  expect: Array<number>,
+  got: readonly number[],
+  expect: readonly number[],
   mode: FlushMode = 'flush'
 ): boolean {
   return (
@@ -1555,7 +1557,7 @@ g.test('fullF32Range')
     const neg_sub = test.params.neg_sub;
     const pos_sub = test.params.pos_sub;
     const pos_norm = test.params.pos_norm;
-    const got = fullF32Range({ neg_norm, neg_sub, pos_sub, pos_norm });
+    const got = scalarF32Range({ neg_norm, neg_sub, pos_sub, pos_norm });
     const expect = test.params.expect;
 
     test.expect(
@@ -1596,7 +1598,7 @@ g.test('fullF16Range')
     const neg_sub = test.params.neg_sub;
     const pos_sub = test.params.pos_sub;
     const pos_norm = test.params.pos_norm;
-    const got = fullF16Range({ neg_norm, neg_sub, pos_sub, pos_norm });
+    const got = scalarF16Range({ neg_norm, neg_sub, pos_sub, pos_norm });
     const expect = test.params.expect;
 
     test.expect(
