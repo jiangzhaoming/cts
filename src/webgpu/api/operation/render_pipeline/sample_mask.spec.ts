@@ -21,7 +21,7 @@ import { makeTestGroup } from '../../../../common/framework/test_group.js';
 import { assert, range } from '../../../../common/util/util.js';
 import { GPUTest, TextureTestMixin } from '../../../gpu_test.js';
 import { checkElementsPassPredicate, checkElementsEqual } from '../../../util/check_contents.js';
-import { TypeF32, TypeU32 } from '../../../util/conversion.js';
+import { Type } from '../../../util/conversion.js';
 import { TexelView } from '../../../util/texture/texel_view.js';
 
 const kColors = [
@@ -129,7 +129,7 @@ function getExpectedStencilData(
 const kSampleMaskTestShader = `
 struct Varyings {
   @builtin(position) Position : vec4<f32>,
-  @location(0) @interpolate(flat) uvFlat : vec2<f32>,
+  @location(0) @interpolate(flat, either) uvFlat : vec2<f32>,
   @location(1) @interpolate(perspective, sample) uvInterpolated : vec2<f32>,
 }
 
@@ -331,7 +331,7 @@ class F extends TextureTestMixin(GPUTest) {
     const renderTargetTextures = [];
     const resolveTargetTextures: (GPUTexture | null)[] = [];
     for (let i = 0; i < colorTargetsCount; i++) {
-      const renderTargetTexture = this.device.createTexture({
+      const renderTargetTexture = this.createTextureTracked({
         format,
         size: {
           width: kRenderTargetSize,
@@ -347,7 +347,7 @@ class F extends TextureTestMixin(GPUTest) {
       const resolveTargetTexture =
         sampleCount === 1
           ? null
-          : this.device.createTexture({
+          : this.createTextureTracked({
               format,
               size: {
                 width: kRenderTargetSize,
@@ -361,7 +361,7 @@ class F extends TextureTestMixin(GPUTest) {
       resolveTargetTextures.push(resolveTargetTexture);
     }
 
-    const depthStencilTexture = this.device.createTexture({
+    const depthStencilTexture = this.createTextureTracked({
       size: {
         width: kRenderTargetSize,
         height: kRenderTargetSize,
@@ -438,7 +438,7 @@ class F extends TextureTestMixin(GPUTest) {
     fragmentShaderOutputMask: number
   ) {
     const buffer = this.copy2DTextureToBufferUsingComputePass(
-      TypeF32, // correspond to 'rgba8unorm' format
+      Type.f32, // correspond to 'rgba8unorm' format
       4,
       texture.createView(),
       sampleCount
@@ -464,7 +464,7 @@ class F extends TextureTestMixin(GPUTest) {
     const buffer = this.copy2DTextureToBufferUsingComputePass(
       // Use f32 as the scalar type for depth (depth24plus, depth32float)
       // Use u32 as the scalar type for stencil (stencil8)
-      aspect === 'depth-only' ? TypeF32 : TypeU32,
+      aspect === 'depth-only' ? Type.f32 : Type.u32,
       1,
       depthStencilTexture.createView({ aspect }),
       sampleCount
@@ -531,11 +531,10 @@ textureLoad each sample index from the texture and write to a storage buffer to 
   .fn(t => {
     const { sampleCount, rasterizationMask, sampleMask, fragmentShaderOutputMask } = t.params;
 
-    const fragmentMaskUniformBuffer = t.device.createBuffer({
+    const fragmentMaskUniformBuffer = t.createBufferTracked({
       size: 4,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     });
-    t.trackForCleanup(fragmentMaskUniformBuffer);
     t.device.queue.writeBuffer(
       fragmentMaskUniformBuffer,
       0,
@@ -647,11 +646,10 @@ color' <= color.
     const sampleMask = 0xffffffff;
 
     const alphaValues = new Float32Array(4); // [alpha0, alpha1, 0, 0]
-    const alphaValueUniformBuffer = t.device.createBuffer({
+    const alphaValueUniformBuffer = t.createBufferTracked({
       size: alphaValues.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     });
-    t.trackForCleanup(alphaValueUniformBuffer);
 
     const module = t.device.createShaderModule({ code: kSampleMaskTestShader });
     const pipeline = t.device.createRenderPipeline({
@@ -705,7 +703,7 @@ color' <= color.
       );
 
       const colorBuffer = t.copy2DTextureToBufferUsingComputePass(
-        TypeF32, // correspond to 'rgba8unorm' format
+        Type.f32, // correspond to 'rgba8unorm' format
         4,
         color.createView(),
         sampleCount
@@ -717,7 +715,7 @@ color' <= color.
       colorResultPromises.push(colorResult);
 
       const depthBuffer = t.copy2DTextureToBufferUsingComputePass(
-        TypeF32, // correspond to 'depth24plus-stencil8' format
+        Type.f32, // correspond to 'depth24plus-stencil8' format
         1,
         depthStencil.createView({ aspect: 'depth-only' }),
         sampleCount
@@ -729,7 +727,7 @@ color' <= color.
       depthResultPromises.push(depthResult);
 
       const stencilBuffer = t.copy2DTextureToBufferUsingComputePass(
-        TypeU32, // correspond to 'depth24plus-stencil8' format
+        Type.u32, // correspond to 'depth24plus-stencil8' format
         1,
         depthStencil.createView({ aspect: 'stencil-only' }),
         sampleCount

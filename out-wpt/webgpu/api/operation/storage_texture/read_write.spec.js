@@ -208,12 +208,11 @@ class F extends GPUTest {
 
           });
 
-          const placeholderColorTexture = device.createTexture({
+          const placeholderColorTexture = this.createTextureTracked({
             size: [rwTexture.width, rwTexture.height, 1],
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
             format: 'rgba8unorm'
           });
-          this.trackForCleanup(placeholderColorTexture);
 
           const renderPassEncoder = commandEncoder.beginRenderPass({
             colorAttachments: [
@@ -316,6 +315,9 @@ combine('textureDimension', kTextureDimensions).
 combine('depthOrArrayLayers', [1, 2]).
 unless((p) => p.textureDimension === '1d' && p.depthOrArrayLayers > 1)
 ).
+beforeAllSubcases((t) => {
+  t.skipIfTextureFormatNotUsableAsStorageTexture(t.params.format);
+}).
 fn((t) => {
   const { format, shaderStage, textureDimension, depthOrArrayLayers } = t.params;
 
@@ -324,13 +326,12 @@ fn((t) => {
   const kWidth = t.isCompatibility ? 8 : 16;
   const height = textureDimension === '1d' ? 1 : 8;
   const textureSize = [kWidth, height, depthOrArrayLayers];
-  const storageTexture = t.device.createTexture({
+  const storageTexture = t.createTextureTracked({
     format,
     dimension: textureDimension,
     size: textureSize,
     usage: GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST | GPUTextureUsage.STORAGE_BINDING
   });
-  t.trackForCleanup(storageTexture);
 
   const bytesPerBlock = kTextureFormatInfo[format].bytesPerBlock;
   const initialData = t.GetInitialData(storageTexture);
@@ -349,11 +350,10 @@ fn((t) => {
   t.RecordCommandsToTransform(t.device, shaderStage, commandEncoder, storageTexture);
 
   const expectedData = t.GetExpectedData(shaderStage, storageTexture, initialData);
-  const readbackBuffer = t.device.createBuffer({
+  const readbackBuffer = t.createBufferTracked({
     size: expectedData.byteLength,
     usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST
   });
-  t.trackForCleanup(readbackBuffer);
   const bytesPerRow = align(bytesPerBlock * kWidth, 256);
   commandEncoder.copyTextureToBuffer(
     {

@@ -39,7 +39,7 @@ fn indexToCoord(idx : u32) -> vec2u {
     case '3d':{
         return `
 fn indexToCoord(idx : u32) -> vec3u {
-  return vec3u(idx % (wgx * num_wgs_x), idx / (wgx * num_wgs_x), 1);
+  return vec3u(idx % (wgx * num_wgs_x), idx / (wgx * num_wgs_x), 0);
 }`;
       }
     default:{
@@ -147,7 +147,7 @@ fn((t) => {
   t.skipIfLanguageFeatureNotSupported('readonly_and_readwrite_storage_textures');
 
   const wgx = 16;
-  const wgy = 16;
+  const wgy = t.device.limits.maxComputeInvocationsPerWorkgroup / wgx;
   const num_wgs_x = 2;
   const num_wgs_y = 2;
   const invocations = wgx * wgy * num_wgs_x * num_wgs_y;
@@ -238,32 +238,27 @@ fn main(@builtin(global_invocation_id) gid : vec3u) {
     write_indices,
     GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE
   );
-  t.trackForCleanup(write_index_buffer);
   const read_index_buffer = t.makeBufferWithContents(
     read_indices,
     GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE
   );
-  t.trackForCleanup(read_index_buffer);
   const write_mask_buffer = t.makeBufferWithContents(
     write_masks,
     GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE
   );
-  t.trackForCleanup(write_mask_buffer);
   const output_buffer = t.makeBufferWithContents(
     new Uint32Array([...iterRange(invocations, (x) => 0)]),
     GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE
   );
-  t.trackForCleanup(output_buffer);
 
   // Texture
   const texture_size = getTextureSize(invocations * num_writes_per_invocation, t.params.dim);
-  const texture = t.device.createTexture({
+  const texture = t.createTextureTracked({
     format: t.params.format,
     dimension: t.params.dim === '2d-array' ? '2d' : t.params.dim,
     size: texture_size,
     usage: GPUTextureUsage.STORAGE_BINDING
   });
-  t.trackForCleanup(texture);
 
   const pipeline = t.device.createComputePipeline({
     layout: 'auto',
