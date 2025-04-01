@@ -20,15 +20,15 @@ is evaluated per-fragment or per-sample. With @interpolate(, sample) or usage of
 `;import { makeTestGroup } from '../../../../common/framework/test_group.js';
 import { ErrorWithExtra, assert, range, unreachable } from '../../../../common/util/util.js';
 
-import { kTextureFormatInfo } from '../../../format_info.js';
-import { GPUTest, TextureTestMixin } from '../../../gpu_test.js';
+import { getBlockInfoForTextureFormat } from '../../../format_info.js';
+import { AllFeaturesMaxLimitsGPUTest, TextureTestMixin } from '../../../gpu_test.js';
 import { getProvokingVertexForFlatInterpolationEitherSampling } from '../../../inter_stage.js';
 import { getMultisampleFragmentOffsets } from '../../../multisample_info.js';
 import { dotProduct, subtractVectors, align } from '../../../util/math.js';
 import { TexelView } from '../../../util/texture/texel_view.js';
 import { findFailedPixels } from '../../../util/texture/texture_ok.js';
 
-class FragmentBuiltinTest extends TextureTestMixin(GPUTest) {}
+class FragmentBuiltinTest extends TextureTestMixin(AllFeaturesMaxLimitsGPUTest) {}
 
 export const g = makeTestGroup(FragmentBuiltinTest);
 
@@ -528,9 +528,8 @@ function computeSampleMask({ sampleMask }) {
  * backends like M1 Mac so it seems better to stick to rgba8unorm here and test
  * using a storage buffer in a fragment shader separately.
  *
- * We can't use rgba32float because it's optional. We can't use rgba16float
- * because it's optional in compat. We can't we use rgba32uint as that can't be
- * multisampled.
+ * We can't use rgba32float, nor rgba16float, nor rgba32uint as they can't be
+ * multisampled in all feature levels.
  */
 async function renderFragmentShaderInputsTo4TexturesAndReadbackValues(
 t,
@@ -1454,76 +1453,6 @@ function popcount(input) {
 }
 
 /**
- * Checks subgroup_size builtin value consistency.
- *
- * The builtin subgroup_size is not assumed to be uniform in fragment shaders.
- * Therefore, this function checks the value is a power of two within the device
- * limits and that the ballot size is less than the stated size.
- * @param data An array of vec4u that contains (per texel):
- *             * builtin value
- *             * ballot size
- *             * comparison to other invocations
- *             * 0
- * @param format The texture format for data
- * @param min The minimum subgroup size from the device
- * @param max The maximum subgroup size from the device
- * @param width The width of the framebuffer
- * @param height The height of the framebuffer
- */
-function checkSubgroupSizeConsistency(
-data,
-format,
-min,
-max,
-width,
-height)
-{
-  const { blockWidth, blockHeight, bytesPerBlock } = kTextureFormatInfo[format];
-  const blocksPerRow = width / blockWidth;
-  // Image copies require bytesPerRow to be a multiple of 256.
-  const bytesPerRow = align(blocksPerRow * (bytesPerBlock ?? 1), 256);
-  const uintsPerRow = bytesPerRow / 4;
-  const uintsPerTexel = (bytesPerBlock ?? 1) / blockWidth / blockHeight / 4;
-
-  for (let row = 0; row < height; row++) {
-    for (let col = 0; col < width; col++) {
-      const offset = uintsPerRow * row + col * uintsPerTexel;
-      const builtinSize = data[offset];
-      const ballotSize = data[offset + 1];
-      const comparison = data[offset + 2];
-      if (builtinSize === 0) {
-        continue;
-      }
-
-      if (popcount(builtinSize) !== 1) {
-        return new Error(`Subgroup size '${builtinSize}' is not a power of two`);
-      }
-
-      if (builtinSize < min) {
-        return new Error(`Subgroup size '${builtinSize}' is less than minimum '${min}'`);
-      }
-      if (max < builtinSize) {
-        return new Error(`Subgroup size '${builtinSize}' is greater than maximum '${max}'`);
-      }
-
-      if (builtinSize < ballotSize) {
-        return new Error(`Inconsistent subgroup ballot size
--   icoord: (${row}, ${col})
-- expected: ${builtinSize}
--      got: ${ballotSize}`);
-      }
-
-      if (comparison !== 1) {
-        return new Error(`Not all invocations in subgroup have same view of the size
-- icoord: (${row}, ${col})`);
-      }
-    }
-  }
-
-  return undefined;
-}
-
-/**
  * Runs a subgroup builtin test for fragment shaders
  *
  * This test draws a full screen in 2 separate draw calls (half screen each).
@@ -1569,7 +1498,7 @@ fn vsMain(@builtin(vertex_index) index : u32) -> @builtin(position) vec4f {
     }
   });
 
-  const { blockWidth, blockHeight, bytesPerBlock } = kTextureFormatInfo[format];
+  const { blockWidth, blockHeight, bytesPerBlock } = getBlockInfoForTextureFormat(format);
   assert(bytesPerBlock !== undefined);
 
   const blocksPerRow = width / blockWidth;
@@ -1600,7 +1529,7 @@ fn vsMain(@builtin(vertex_index) index : u32) -> @builtin(position) vec4f {
 
     });
     pass.setPipeline(pipeline);
-    // Draw the uperr-left triangle (vertices 0-2) or the lower-right triangle (vertices 3-5)
+    // Draw the upper-left triangle (vertices 0-2) or the lower-right triangle (vertices 3-5)
     pass.draw(3, 1, i * 3);
     pass.end();
     t.queue.submit([encoder.finish()]);
@@ -1618,6 +1547,101 @@ fn vsMain(@builtin(vertex_index) index : u32) -> @builtin(position) vec4f {
   }
 }
 
+const kMaximumSubgroupSize = 128;
+// A non-zero magic number indicating no expectation error, in order to prevent the false no-error
+// result from zero-initialization.
+const kSubgroupShaderNoError = 17;
+
+/**
+ * Checks subgroup_size builtin value consistency.
+ *
+ * The builtin subgroup_size is not assumed to be uniform in fragment shaders.
+ * Therefore, this function checks the value is a power of two within the device
+ * limits and that the ballot size is less than the stated size.
+ * @param data An array of vec4u that contains (per texel):
+ *             * subgroup_size builtin value
+ *             * balloted active invocations number
+ *             * balloted subgroup size all active invocations agreed on, otherwise 0
+ *             * error flag, should be equal to kSubgroupShaderNoError or shader found
+ *               expectation failed otherwise.
+ * @param format The texture format for data
+ * @param min The minimum subgroup size from the device
+ * @param max The maximum subgroup size from the device
+ * @param width The width of the framebuffer
+ * @param height The height of the framebuffer
+ */
+function checkSubgroupSizeConsistency(
+data,
+format,
+min,
+max,
+width,
+height)
+{
+  const { blockWidth, blockHeight, bytesPerBlock } = getBlockInfoForTextureFormat(format);
+  const blocksPerRow = width / blockWidth;
+  // Image copies require bytesPerRow to be a multiple of 256.
+  const bytesPerRow = align(blocksPerRow * (bytesPerBlock ?? 1), 256);
+  const uintsPerRow = bytesPerRow / 4;
+  const uintsPerTexel = (bytesPerBlock ?? 1) / blockWidth / blockHeight / 4;
+
+  for (let row = 0; row < height; row++) {
+    for (let col = 0; col < width; col++) {
+      const offset = uintsPerRow * row + col * uintsPerTexel;
+      const subgroupSize = data[offset];
+      const countActive = data[offset + 1];
+      const ballotedSubgroupSize = data[offset + 2];
+      const error = data[offset + 3];
+
+      if (error === 0) {
+        // Inactive fragment get error `0` instead of noError. Check all output being zero.
+        if (subgroupSize !== 0 || countActive !== 0 || ballotedSubgroupSize !== 0) {
+          return new Error(
+            `Unexpected zero error with non-zero outputs for (${row}, ${col}): got output [${subgroupSize}, ${countActive}, ${ballotedSubgroupSize}, ${error}]`
+          );
+        }
+        continue;
+      }
+
+      if (popcount(subgroupSize) !== 1) {
+        return new Error(`Subgroup size '${subgroupSize}' is not a power of two`);
+      }
+
+      if (subgroupSize < min) {
+        return new Error(`Subgroup size '${subgroupSize}' is less than minimum '${min}'`);
+      }
+      if (max < subgroupSize) {
+        return new Error(`Subgroup size '${subgroupSize}' is greater than maximum '${max}'`);
+      }
+
+      if (subgroupSize < countActive) {
+        return new Error(`Unexpected active invocations number larger than subgroup size
+-       icoord: (${row}, ${col})
+- subgroupSize: ${subgroupSize}
+-  countActive: ${countActive}`);
+      }
+
+      if (subgroupSize !== ballotedSubgroupSize) {
+        return new Error(`Inconsistent subgroup size
+-                 icoord: (${row}, ${col})
+-           subgroupSize: ${subgroupSize}
+- balloted subgroup size: ${ballotedSubgroupSize}`);
+      }
+
+      if (error !== kSubgroupShaderNoError) {
+        return new Error(
+          `Unexpected error value
+-   icoord: (${row}, ${col})
+- expected: noError (${kSubgroupShaderNoError})
+-      got: ${error}`
+        );
+      }
+    }
+  }
+
+  return undefined;
+}
+
 g.test('subgroup_size').
 desc('Tests subgroup_size values').
 params((u) =>
@@ -1626,18 +1650,19 @@ combine('size', kSizes).
 beginSubcases().
 combineWithParams([{ format: 'rgba32uint' }])
 ).
-beforeAllSubcases((t) => {
-  t.selectDeviceOrSkipTestCase('subgroups');
-}).
 fn(async (t) => {
+  t.skipIfDeviceDoesNotHaveFeature('subgroups');
 
 
 
 
-  const { minSubgroupSize, maxSubgroupSize } = t.device.limits;
+  const { subgroupMinSize, subgroupMaxSize } = t.device.adapterInfo;
 
   const fsShader = `
 enable subgroups;
+
+const subgroupMaxSize = ${kMaximumSubgroupSize}u;
+const noError = ${kSubgroupShaderNoError}u;
 
 const width = ${t.params.size[0]};
 const height = ${t.params.size[1]};
@@ -1647,16 +1672,35 @@ fn fsMain(
   @builtin(position) pos : vec4f,
   @builtin(subgroup_size) sg_size : u32,
 ) -> @location(0) vec4u {
-  let ballot = countOneBits(subgroupBallot(true));
-  let ballotSize = ballot.x + ballot.y + ballot.z + ballot.w;
+  var error: u32 = noError;
 
-  // Do all invocations in the subgroup see the same subgroup size?
-  let firstSize = subgroupBroadcast(sg_size, 0);
-  let compareBallot = countOneBits(subgroupBallot(firstSize == sg_size));
-  let compareSize = compareBallot.x + compareBallot.y + compareBallot.z + compareBallot.w;
-  let sameSize = select(0u, 1u, compareSize == ballotSize);
+  let ballotActive = countOneBits(subgroupBallot(true));
+  let countActive = ballotActive.x + ballotActive.y + ballotActive.z + ballotActive.w;
+  // Validate that balloted active invocations number no larger than subgroup size
+  if (countActive > sg_size) {
+    error++;
+  }
 
-  return vec4u(sg_size, ballotSize, sameSize, 0);
+  var subgroupSizeBallotedInvocations: u32 = 0u;
+  var ballotedSubgroupSize: u32 = 0u;
+  for (var i: u32 = 0; i <= subgroupMaxSize; i++) {
+    let ballotSubgroupSizeEqualI = countOneBits(subgroupBallot(sg_size == i));
+    let countSubgroupSizeEqualI = ballotSubgroupSizeEqualI.x + ballotSubgroupSizeEqualI.y + ballotSubgroupSizeEqualI.z + ballotSubgroupSizeEqualI.w;
+    subgroupSizeBallotedInvocations += countSubgroupSizeEqualI;
+    // Validate that all active invocations see the same subgroup size, i.e. ballotedSubgroupSize
+    ballotedSubgroupSize = select(ballotedSubgroupSize, i, countSubgroupSizeEqualI == countActive);
+    error = select(error, error + 1, countSubgroupSizeEqualI != countActive && countSubgroupSizeEqualI != 0);
+  }
+  // Validate that all active invocations balloted in previous loop
+  if (subgroupSizeBallotedInvocations != countActive) {
+    error++;
+  }
+  // Validate that ballotedSubgroupSize is identical to subgroup_size
+  if (ballotedSubgroupSize != sg_size) {
+    error++;
+  }
+
+  return vec4u(sg_size, countActive, ballotedSubgroupSize, error);
 }`;
 
   await runSubgroupTest(
@@ -1669,18 +1713,14 @@ fn fsMain(
       return checkSubgroupSizeConsistency(
         data,
         t.params.format,
-        minSubgroupSize,
-        maxSubgroupSize,
+        subgroupMinSize,
+        subgroupMaxSize,
         t.params.size[0],
         t.params.size[1]
       );
     }
   );
 });
-
-// A non-zero magic number indicating no expectation error, in order to prevent the false no-error
-// result from zero-initialization.
-const kSubgroupInvocationIdNoError = 17;
 
 /**
  * Checks subgroup_invocation_id value consistency
@@ -1693,8 +1733,8 @@ const kSubgroupInvocationIdNoError = 17;
  *             * subgroup_invocation_id
  *             * subgroup size
  *             * ballot active invocation number
- *             * error flag, should be equal to kSubgroupInvocationIdNoError or shader found
- *               expection failed otherwise.
+ *             * error flag, should be equal to kSubgroupShaderNoError or shader found
+ *               expectation failed otherwise.
  * @param format The texture format of data
  * @param width The width of the framebuffer
  * @param height The height of the framebuffer
@@ -1705,7 +1745,7 @@ format,
 width,
 height)
 {
-  const { blockWidth, blockHeight, bytesPerBlock } = kTextureFormatInfo[format];
+  const { blockWidth, blockHeight, bytesPerBlock } = getBlockInfoForTextureFormat(format);
   const blocksPerRow = width / blockWidth;
   const bytesPerRow = align(blocksPerRow * (bytesPerBlock ?? 1), 256);
   const uintsPerRow = bytesPerRow / 4;
@@ -1741,11 +1781,11 @@ height)
         );
       }
 
-      if (error !== kSubgroupInvocationIdNoError) {
+      if (error !== kSubgroupShaderNoError) {
         return new Error(
           `Unexpected error value
 -   icoord: (${row}, ${col})
-- expected: noError (${kSubgroupInvocationIdNoError})
+- expected: noError (${kSubgroupShaderNoError})
 -      got: ${error}`
         );
       }
@@ -1763,20 +1803,18 @@ combine('size', kSizes).
 beginSubcases().
 combineWithParams([{ format: 'rgba32uint' }])
 ).
-beforeAllSubcases((t) => {
-  t.selectDeviceOrSkipTestCase('subgroups');
-}).
 fn(async (t) => {
+  t.skipIfDeviceDoesNotHaveFeature('subgroups');
   const fsShader = `
 enable subgroups;
 
 const width = ${t.params.size[0]};
 const height = ${t.params.size[1]};
 
-const maxSubgroupSize = 128u;
+const subgroupMaxSize = ${kMaximumSubgroupSize}u;
 // A non-zero magic number indicating no expectation error, in order to prevent the
 // false no-error result from zero-initialization.
-const noError = ${kSubgroupInvocationIdNoError}u;
+const noError = ${kSubgroupShaderNoError}u;
 
 @fragment
 fn fsMain(
@@ -1787,8 +1825,8 @@ fn fsMain(
 
   var error: u32 = noError;
 
-  // Validate that reported subgroup size is no larger than maxSubgroupSize
-  if (sg_size > maxSubgroupSize) {
+  // Validate that reported subgroup size is no larger than subgroupMaxSize
+  if (sg_size > subgroupMaxSize) {
     error++;
   }
 
@@ -1800,7 +1838,7 @@ fn fsMain(
   // Validate that each subgroup id is assigned to at most one active invocation
   // in the subgroup
   var countAssignedId: u32 = 0u;
-  for (var i: u32 = 0; i < maxSubgroupSize; i++) {
+  for (var i: u32 = 0; i < subgroupMaxSize; i++) {
     let ballotIdEqualsI = countOneBits(subgroupBallot(id == i));
     let countInvocationIdEqualsI = ballotIdEqualsI.x + ballotIdEqualsI.y + ballotIdEqualsI.z + ballotIdEqualsI.w;
     // Validate an id assigned at most once
