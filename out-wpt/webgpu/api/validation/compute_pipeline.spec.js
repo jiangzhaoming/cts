@@ -170,7 +170,7 @@ fn((t) => {
         code: `
           var<workgroup> data: array<${type}, ${count}>;
           @compute @workgroup_size(64) fn main () {
-            _ = data;
+            data[0] = data[${count - 1}];
           }
           `
       }),
@@ -804,7 +804,7 @@ fn((t) => {
     `;
   const module = t.device.createShaderModule({ code });
 
-  const success = isTextureFormatUsableWithStorageAccessMode(t.device, format, access);
+  const success = isTextureFormatUsableWithStorageAccessMode(t.device.features, format, access);
   const descriptor = {
     layout: 'auto',
     compute: { module }

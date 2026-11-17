@@ -111,7 +111,7 @@ g.test('shuffle,id')
   .desc(`Tests various ways to shuffle invocations`)
   .params(u => u.combine('case', keysOf(kShuffleCases)))
   .fn(async t => {
-    t.skipIfDeviceDoesNotHaveFeature('subgroups' as GPUFeatureName);
+    t.skipIfDeviceDoesNotHaveFeature('subgroups');
     const testcase = kShuffleCases[t.params.case];
 
     const wgsl = `
@@ -233,7 +233,7 @@ g.test('shuffleUpDown,delta')
   .desc(`Test ShuffleUp and ShuffleDown deltas`)
   .params(u => u.combine('op', kUpDownOps).combine('case', keysOf(kUpDownCases)))
   .fn(async t => {
-    t.skipIfDeviceDoesNotHaveFeature('subgroups' as GPUFeatureName);
+    t.skipIfDeviceDoesNotHaveFeature('subgroups');
     const testcase = kUpDownCases[t.params.case];
 
     const wgsl = `
@@ -324,7 +324,7 @@ g.test('shuffleXor,mask')
   .desc(`Test ShuffleXor masks`)
   .params(u => u.combine('case', keysOf(kMaskCases)))
   .fn(async t => {
-    t.skipIfDeviceDoesNotHaveFeature('subgroups' as GPUFeatureName);
+    t.skipIfDeviceDoesNotHaveFeature('subgroups');
     const testcase = kMaskCases[t.params.case];
 
     const wgsl = `
@@ -508,7 +508,7 @@ g.test('compute,all_active')
       .combine('case', [...iterRange(kNumCases, x => x)])
   )
   .fn(async t => {
-    t.skipIfDeviceDoesNotHaveFeature('subgroups' as GPUFeatureName);
+    t.skipIfDeviceDoesNotHaveFeature('subgroups');
     const wgThreads = t.params.wgSize[0] * t.params.wgSize[1] * t.params.wgSize[2];
 
     let selectValue = `input[lid]`;
@@ -586,7 +586,7 @@ g.test('compute,split')
       .combine('wgSize', kWGSizes)
   )
   .fn(async t => {
-    t.skipIfDeviceDoesNotHaveFeature('subgroups' as GPUFeatureName);
+    t.skipIfDeviceDoesNotHaveFeature('subgroups');
     const testcase = kPredicateCases[t.params.predicate];
     const wgThreads = t.params.wgSize[0] * t.params.wgSize[1] * t.params.wgSize[2];
 
@@ -741,7 +741,7 @@ g.test('data_types')
   .fn(async t => {
     const wgSize = [4, 1, 1];
     const type = kTypes[t.params.type];
-    t.skipIfDeviceDoesNotHaveFeature('subgroups' as GPUFeatureName);
+    t.skipIfDeviceDoesNotHaveFeature('subgroups');
     if (type.requiresF16()) {
       t.skipIfDeviceDoesNotHaveFeature('shader-f16');
     }
@@ -887,7 +887,7 @@ g.test('fragment')
       .combineWithParams([{ format: 'rgba32uint' }] as const)
   )
   .fn(async t => {
-    t.skipIfDeviceDoesNotHaveFeature('subgroups' as GPUFeatureName);
+    t.skipIfDeviceDoesNotHaveFeature('subgroups');
     const fsShader = `
 enable subgroups;
 
@@ -929,6 +929,75 @@ fn main(
           t.params.id,
           t.params.op
         );
+      }
+    );
+  });
+
+g.test('shuffle,out_of_bounds')
+  .desc(
+    `Tests that OOB subgroupShuffle (using dynamic IDs) does not leak data from outside the workgroup`
+  )
+  .params(u => u.combine('oob_id', [32, 33, 64, 65, 127, 128, 1000, 0xffffffff]))
+  .fn(async t => {
+    t.skipIfDeviceDoesNotHaveFeature('subgroups');
+
+    const kSize = 32;
+    const kSentinelLeft = 0xdead;
+    const kSentinelRight = 0xbeef;
+
+    const wgsl = `
+enable subgroups;
+
+@group(0) @binding(0)
+var<storage, read> input : array<u32>;
+
+@group(0) @binding(1)
+var<storage, read_write> output : array<u32>;
+
+@group(0) @binding(2)
+var<storage, read_write> metadata : array<u32>; // unused
+
+@compute @workgroup_size(${kSize})
+fn main(
+  @builtin(local_invocation_id) lid : vec3<u32>,
+) {
+  // Force usage
+  _ = metadata[0];
+
+  let id = input[0];
+  // offset is 1 (for id) + 64 (for SentinelLeft)
+  let offset = 65u;
+  let value = input[offset + lid.x];
+
+  let res = subgroupShuffle(value, id);
+  output[lid.x] = res;
+}`;
+
+    // input buffer: [OOB_ID, SentinelLeft x 64, Predictable x 32, SentinelRight x 64]
+    const inputData = new Uint32Array(1 + 64 + 32 + 64);
+    inputData[0] = t.params.oob_id;
+    for (let i = 0; i < 64; i++) inputData[1 + i] = kSentinelLeft;
+    for (let i = 0; i < 32; i++) inputData[1 + 64 + i] = i;
+    for (let i = 0; i < 64; i++) inputData[1 + 64 + 32 + i] = kSentinelRight;
+
+    const uintsPerOutput = 1;
+    await runComputeTest(
+      t,
+      wgsl,
+      [kSize, 1, 1],
+      uintsPerOutput,
+      inputData,
+      (metadata: Uint32Array, output: Uint32Array) => {
+        for (let i = 0; i < kSize; i++) {
+          const res = output[i];
+
+          if (res === kSentinelLeft || res === kSentinelRight) {
+            return new Error(`Invocation ${i}: incorrect results (id ${t.params.oob_id})
+- expected: indeterminate value (not a sentinel marker)
+-      got: 0x${res.toString(16)}`);
+          }
+        }
+        return undefined;
       }
     );
   });

@@ -1,5 +1,5 @@
 import { keysOf } from '../../../../../common/util/data_tables.js';
-import { assert } from '../../../../../common/util/util.js';
+import { assert, hasFeature } from '../../../../../common/util/util.js';
 import { align, roundDown } from '../../../../util/math.js';
 
 import {
@@ -94,8 +94,8 @@ function getModuleForWorkgroupStorageSize(device: GPUDevice, wgslType: WGSLType,
     var<workgroup> d0: array<${wgslType}, ${units}>;
     ${extra ? `var<workgroup> d1: array<vec4<f32>, ${extra}>;` : ''}
     @compute @workgroup_size(1) fn main() {
-      _ = d0;
-      ${extra ? '_ = d1;' : ''}
+      d0[0] = d0[${units - 1}];
+      ${extra ? `d1[0] = d1[${extra - 1}];` : ''}
     }
   `;
   return { module: device.createShaderModule({ code }), code };
@@ -152,7 +152,7 @@ g.test('createComputePipeline,at_over')
     const { limitTest, testValueName, async, wgslType } = t.params;
     const { defaultLimit, adapterLimit: maximumLimit } = t;
 
-    const hasF16 = t.adapter.features.has('shader-f16');
+    const hasF16 = hasFeature(t.adapter.features, 'shader-f16');
     if (!hasF16 && wgslType in wgslF16Types) {
       return;
     }
